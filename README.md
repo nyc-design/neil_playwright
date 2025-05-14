@@ -1,4 +1,4 @@
-# playwright-gpt-utils
+# neil_playwright
 
 **A modular scraping and automation toolkit using Playwright, GPT-4, and anti-bot protections.**  
 Built for resilient web data collection, with verification code extraction, smart selector/key inference, proxy rotation, and more.
