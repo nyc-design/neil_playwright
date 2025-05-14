@@ -21,6 +21,7 @@ class PlaywrightManager:
     def __init__(self, config = None, logger: UniversalLogger = None):
         self.logger = logger or print
         configuration = self._load_config(config)
+        self.logger.info(f"Configuration: {configuration}")
         self.chrome_path = configuration.get("CHROME_PATH") or self.get_default_chrome_path()
         self.profile_path = configuration.get("PROFILE_PATH", None)
         self.profile_name = configuration.get("PROFILE_NAME", None)
@@ -46,8 +47,10 @@ class PlaywrightManager:
     def _load_config(self, config: str):
         if isinstance(config, str) and os.path.isfile(config):
             with open(config, "r") as f:
+                self.logger.info(f"Loading config from {config}")
                 self.config = json.load(f)
         elif isinstance(config, dict):
+            self.logger.info("Config is already a dict")
             self.config = config
         else:
             raise ValueError("config must be a dict or a valid JSON file path")
