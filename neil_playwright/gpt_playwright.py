@@ -9,9 +9,9 @@ from pymongo.database import Database
 
 
 class GPTPlaywright:
-    def __init__(self, playwright_manager: PlaywrightManager, db: Database, logger: UniversalLogger = None):
+    def __init__(self, api_key: str = None, config = None, playwright_manager: PlaywrightManager = None, db: Database = None, logger: UniversalLogger = None):
         self.logger = logger or print
-        self.gpt = GPTHandler()
+        self.gpt = GPTHandler(api_key, config, logger)
         self.playwright_manager = playwright_manager
         self.db = db
         self.endpoints_db = self.db["endpoints"]
@@ -256,11 +256,11 @@ class GPTPlaywright:
 # ─────────────────────────────────────────────
 
 class GPTVerification:
-    def __init__(self, gmail_email: str = None, gmail_app_password: str = None, logger: UniversalLogger = None):
-        self.logger = logger
+    def __init__(self, api_key: str = None, config = None, gmail_email: str = None, gmail_app_password: str = None, logger: UniversalLogger = None):
+        self.logger = logger or print
         self.gmail_user = gmail_email
         self.gmail_app_password = gmail_app_password
-        self.gpt = GPTHandler()
+        self.gpt = GPTHandler(api_key, config, logger)
 
     # ─────────────────────────────────────────────
     # Verification Helpers

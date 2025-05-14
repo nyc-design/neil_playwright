@@ -13,7 +13,7 @@ import os
 
 class GPTHandler:
     def __init__(self, api_key: str = None, config = None, logger: UniversalLogger = None):
-        self.logger = logger
+        self.logger = logger or print
         configuration = self._load_config(config)
         self.upper_model = configuration.get("upper_model", {}).get("name")
         self.lower_model = configuration.get("lower_model", {}).get("name")
