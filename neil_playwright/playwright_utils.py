@@ -85,7 +85,8 @@ class PlaywrightManager:
         # Get context args (sets self.abm.geo, user_agent, proxy)
         context_args = self.abm.get_playwright_context(self.playwright.devices)
 
-        args = []
+        args=["--no-sandbox","--disable-dev-shm-usage"]
+        
         if self.profile_name:
             args.append(f"--profile-directory={self.profile_name}")
         if self.extension_path:
