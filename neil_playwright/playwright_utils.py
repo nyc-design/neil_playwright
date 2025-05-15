@@ -191,7 +191,7 @@ class PlaywrightManager:
         for attempt in range(retries):
             try:
                 with self.expect_responses(endpoints or [], method, timeout) as listeners:
-                    self.logger.info(f"Loading URL or Selector: {locator} (attempt {attempt + 1})")
+                    self.logger.info(f"Loading: {locator} (attempt {attempt + 1})")
                     self.navigate(current_url, method, locator, hover_and_click = hover_and_click, human_cursor = human_cursor)
                     
                     if not self.test_page_load(tests, before_html, timeout=timeout):
