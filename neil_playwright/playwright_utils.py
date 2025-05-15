@@ -267,6 +267,12 @@ class PlaywrightManager:
             self.reset_page(new_page)
             self.page.wait_for_load_state("load")
             self.page.wait_for_url(lambda url: url != current_url)
+        elif method == "enter_button":
+            if hover_and_click:
+                self.scroll_and_hover(locator, human_cursor)
+            self.locator.press("Enter")
+            self.page.wait_for_load_state("load")
+            self.page.wait_for_url(lambda url: url != current_url)
         elif method == "reload":
             self.page.reload()
             self.page.wait_for_load_state("load")
