@@ -21,12 +21,17 @@ class GPTHandler:
         self.lower_token_limit = configuration.get("lower_model", {}).get("limit")
         self.client = OpenAI(api_key=api_key)
 
+
     def _load_config(self, config: str):
         if isinstance(config, str) and os.path.isfile(config):
             with open(config, "r") as f:
-                self.config = json.load(f)
+                self.logger.info(f"Loading config from {config}")
+                configuration = json.load(f)
+            return configuration
         elif isinstance(config, dict):
-            self.config = config
+            self.logger.info("Config is already a dict")
+            configuration = config
+            return configuration
         else:
             raise ValueError("config must be a dict or a valid JSON file path")
 

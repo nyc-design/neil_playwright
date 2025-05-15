@@ -48,10 +48,12 @@ class PlaywrightManager:
         if isinstance(config, str) and os.path.isfile(config):
             with open(config, "r") as f:
                 self.logger.info(f"Loading config from {config}")
-                self.config = json.load(f)
+                configuration = json.load(f)
+            return configuration
         elif isinstance(config, dict):
             self.logger.info("Config is already a dict")
-            self.config = config
+            configuration = config
+            return configuration
         else:
             raise ValueError("config must be a dict or a valid JSON file path")
 
