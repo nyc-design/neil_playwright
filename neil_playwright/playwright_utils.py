@@ -191,7 +191,6 @@ class PlaywrightManager:
         for attempt in range(retries):
             try:
                 with self.expect_responses(endpoints or [], method, timeout) as listeners:
-                    self.logger.info(f"Loading: {locator} (attempt {attempt + 1})")
                     self.navigate(current_url, method, locator, hover_and_click = hover_and_click, human_cursor = human_cursor)
                     
                     if not self.test_page_load(tests, before_html, timeout=timeout):
@@ -326,6 +325,7 @@ class PlaywrightManager:
                 locator.click(modifiers=["ControlOrMeta"])
         
         new_tab = new_page_info.value
+        self.logger.info(f"Opened new tab")
 
         return new_tab
     
@@ -346,7 +346,6 @@ class PlaywrightManager:
         try:
             current_tab = self.page
             if current_tab != self.master_tab and len(self.context.pages) > 1:
-                self.logger.info("Closing current tab and returning to master tab.")
                 current_tab.close()
 
                 # Poll until only one tab remains — avoids time.sleep

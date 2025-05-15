@@ -25,8 +25,6 @@ class GPTPlaywright:
 
     # Function to fetch the most recent selectors for a specific category from the database
     def get_selector_doc_from_db(self, category: str) -> dict:
-        self.logger.info(f"Fetching selector doc for category: {category}")
-        # Fetch the selectors for the given category
         selectors_doc = self.selectors_db.find_one({"category": category})
         if not selectors_doc:
             self.logger.error(f"No selector doc found for category: {category}")
@@ -37,8 +35,6 @@ class GPTPlaywright:
 
     # Function to update selectors for a specific category in the database
     def update_selectors_in_db(self, category: str, new_selectors: dict) -> None:
-        self.logger.info(f"Updating selectors for category: {category}")
-        # Update the existing document for this category or create if it doesn't exist
         self.selectors_db.update_one(
             {"category": category},
             {
@@ -49,7 +45,6 @@ class GPTPlaywright:
             },
             upsert=True
         )
-        self.logger.info(f"Successfully updated selectors for category: {category}")
 
 
     # ─────────────────────────────────────────────
@@ -58,8 +53,6 @@ class GPTPlaywright:
 
     # Function to fetch the most recent JJSON keys for a specific category from the database
     def get_endpoint_doc_from_db(self, endpoint_name: str) -> dict:
-        self.logger.info(f"Fetching endpoint doc for: {endpoint_name}")
-        # Fetch the selectors for the given category
         endpoint_doc = self.endpoints_db.find_one({"name": endpoint_name})
         if not endpoint_doc:
             self.logger.error(f"No endpoint doc found for: {endpoint_name}")
@@ -70,8 +63,6 @@ class GPTPlaywright:
 
     # Function to update JSON keys for a specific category in the database
     def update_keys_in_db(self, endpoint_name: str, new_keys: dict) -> None:
-        self.logger.info(f"Updating keys for endpoint: {endpoint_name}")
-        # Update the existing document for this category or create if it doesn't exist
         self.endpoints_db.update_one(
             {"name": endpoint_name},
             {
@@ -82,7 +73,6 @@ class GPTPlaywright:
             },
             upsert=True
         )
-        self.logger.info(f"Successfully updated keys for endpoint: {endpoint_name}")
 
     # ─────────────────────────────────────────────
     # Prompt Helpers
@@ -192,6 +182,7 @@ class GPTPlaywright:
             if new_selectors:
                 self.update_selectors_in_db(category, new_selectors)
             
+            self.logger.info(f"New selectors generated for category: {category}")
             return new_selectors
             
         except Exception as e:
@@ -243,6 +234,7 @@ class GPTPlaywright:
             if new_keys:
                 self.update_keys_in_db(endpoint_name, new_keys)
 
+            self.logger.info(f"New keys generated for endpoint: {endpoint_name}")
             return new_keys, endpoint
         
         except Exception as e:
