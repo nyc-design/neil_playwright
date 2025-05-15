@@ -153,10 +153,22 @@ class AntiBotManager:
                 self.logger.warning(f"Failed to get page content: {e}")
                 return False
 
-        detected = any(kw in html for kw in [
-            "captcha", "verify you are human", "robot check",
-            "/recaptcha", "arkoselabs", "hcaptcha", "funcaptcha"
-        ])
+        lower = html.lower()
+        
+        keywords = [
+            "data-sitekey",                     # reCAPTCHA widget
+            "/recaptcha/api2/",                 # reCAPTCHA endpoint
+            "g-recaptcha",                      # reCAPTCHA init
+            "hcaptcha-response",                # hCaptcha widget
+            "hcaptcha.js",                      # hCaptcha script
+            "funcaptcha.com",                   # FunCaptcha domain
+            "/sorry/index",                     # Google “sorry” block page
+            "unusual traffic",                  # Google block messaging
+            "our systems have detected unusual traffic"
+        ]
+
+        detected = any(token in lower for token in keywords)
+
         if detected:
             if not self.captcha_extension_exists:
                 self.logger.error("CAPTCHA detected on page, but CAPTCHA_EXTENSION does not exist.")
