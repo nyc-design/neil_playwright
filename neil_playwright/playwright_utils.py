@@ -20,14 +20,12 @@ from neil_logger import UniversalLogger
 class PlaywrightManager:
     def __init__(self, config = None, logger: UniversalLogger = None):
         self.logger = logger or print
-        configuration = self._load_config(config)
-        self.logger.info(f"Configuration: {configuration}")
-        self.chrome_path = configuration.get("CHROME_PATH") or self.get_default_chrome_path()
-        self.profile_path = configuration.get("PROFILE_PATH", None)
-        self.profile_name = configuration.get("PROFILE_NAME", None)
-        self.extension_path = configuration.get("EXTENSION_PATH", None)
-
-        self.abm = AntiBotManager(mode=self.mode, config=configuration, logger=self.logger)
+        self.configuration = self._load_config(config)
+        self.logger.info(f"Configuration: {self.configuration}")
+        self.chrome_path = self.configuration.get("CHROME_PATH") or self.get_default_chrome_path()
+        self.profile_path = self.configuration.get("PROFILE_PATH", None)
+        self.profile_name = self.configuration.get("PROFILE_NAME", None)
+        self.extension_path = self.configuration.get("EXTENSION_PATH", None)
 
 
     def launch_playwright(self, mode: str = "desktop", persist_session: bool = False, context_id: str = "default", headless: bool = False):
@@ -35,6 +33,7 @@ class PlaywrightManager:
         self.persist_session = persist_session
         self.context_id = context_id
         self.session_file = f"state_{context_id}.json"
+        self.abm = AntiBotManager(mode=self.mode, config=self.configuration, logger=self.logger)
     
         self.playwright = sync_playwright().start()
         self.context = self._init_context(headless)
