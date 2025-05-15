@@ -41,6 +41,25 @@ class PlaywrightManager:
         self.cursor = create_cursor(self.page)
         self.logger.info("Playwright manager initialized successfully")
 
+
+    def close_playwright(self):
+        try:
+            if self.context:
+                try:
+                    self.context.close()
+                    self.logger.info("Playwright context closed.")
+                except Exception as e:
+                    self.logger.warning(f"Context already closed or failed to close cleanly: {e}")
+            
+            if self.playwright:
+                try:
+                    self.playwright.stop()
+                    self.logger.info("Playwright stopped.")
+                except Exception as e:
+                    self.logger.warning(f"Failed to stop Playwright cleanly: {e}")
+        except Exception as final_error:
+            self.logger.error(f"Unexpected error during shutdown: {final_error}")
+
     
     def _load_config(self, config: str):
         if isinstance(config, str) and os.path.isfile(config):
@@ -648,25 +667,3 @@ class PlaywrightManager:
             self.logger.error(f"Screenshot failed: {e}")
 
 
-    # ─────────────────────────────────────────────
-    # Cleanup
-    # ─────────────────────────────────────────────
-
-    # Function to close browser
-    def close(self):
-        try:
-            if self.context:
-                try:
-                    self.context.close()
-                    self.logger.info("Playwright context closed.")
-                except Exception as e:
-                    self.logger.warning(f"Context already closed or failed to close cleanly: {e}")
-            
-            if self.playwright:
-                try:
-                    self.playwright.stop()
-                    self.logger.info("Playwright stopped.")
-                except Exception as e:
-                    self.logger.warning(f"Failed to stop Playwright cleanly: {e}")
-        except Exception as final_error:
-            self.logger.error(f"Unexpected error during shutdown: {final_error}")
