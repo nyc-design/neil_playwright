@@ -21,7 +21,6 @@ class PlaywrightManager:
     def __init__(self, config = None, logger: UniversalLogger = None):
         self.logger = logger or print
         self.configuration = self._load_config(config)
-        self.logger.info(f"Configuration: {self.configuration}")
         self.chrome_path = self.configuration.get("CHROME_PATH") or self.get_default_chrome_path()
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
@@ -46,11 +45,9 @@ class PlaywrightManager:
     def _load_config(self, config: str):
         if isinstance(config, str) and os.path.isfile(config):
             with open(config, "r") as f:
-                self.logger.info(f"Loading config from {config}")
                 configuration = json.load(f)
             return configuration
         elif isinstance(config, dict):
-            self.logger.info("Config is already a dict")
             configuration = config
             return configuration
         else:
@@ -216,7 +213,7 @@ class PlaywrightManager:
                 break
             
             except Exception as e:
-                self.logger.warning(f"Navigation failed: {e}")
+                self.logger.warning(f"Navigation failed for {locator} on attempt {attempt + 1}: {e}")
                 if not self.persist_session:
                     self.rotate_context()
                 self.retry_break(attempt)
