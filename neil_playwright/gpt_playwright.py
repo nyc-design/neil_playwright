@@ -4,8 +4,10 @@ import imaplib
 from datetime import datetime
 import time
 import re
+import math
 from .playwright_utils import PlaywrightManager
 from pymongo.database import Database
+from collections import defaultdict, deque
 
 
 class GPTPlaywright:
@@ -78,59 +80,114 @@ class GPTPlaywright:
     # Prompt Helpers
     # ─────────────────────────────────────────────
 
-    def get_gpt_prompts(self, doc: dict, collection: str) -> tuple[str, str]:
+    def build_gpt_prompts(self, doc: dict, collection: str) -> tuple[str, str]:
         if collection == "selectors":
-            field_docs = self.fieldpolicies_db.find({"selectors": doc.get("category")})
+            field_docs = list(self.fieldpolicies_db.find({"selectors": doc.get("category")}))
         elif collection == "endpoints":
-            field_docs = self.fieldpolicies_db.find({"endpoints": doc.get("name")})
+            field_docs = list(self.fieldpolicies_db.find({"endpoints": doc.get("name")}))
         else:
-            field_docs = []
             self.logger.error(f"Invalid collection: {collection}")
             return None, None
 
-        master_prompt = doc.get("master_prompt", None)
+        master_prompt = doc.get("master_prompt") or ""
         optional_prompts_array = doc.get("optional_prompts", [])
+
+        field_doc_map = {f["field_name"]: f for f in field_docs}
 
         prompt_pattern = re.compile(r'^(?:\((?P<num>\d+)\))?(?P<field>[^:]+):\s*(?P<desc>.+)$')
 
-        optional_prompts = []
+        items = []
+        seen  = set()
 
-        for prompt in optional_prompts_array:
-            match = prompt_pattern.match(prompt)
+        for raw in optional_prompts_array:
+            match = prompt_pattern.match(raw)
             if not match:
                 continue
+            name = match.group("field")
             order = int(match.group("num")) if match.group("num") else None
-            optional_prompts.append({
-                "field_name": match.group("field"),
+            description = match.group("desc").strip()
+
+            depends_on = field_doc_map.get(name, {}).get("depends_on") or []
+
+            if isinstance(depends_on, str):
+                depends_on = [depends_on]
+
+            items.append({
+                "field_name": name,
                 "order": order,
-                "description": match.group("desc")
+                "description": description,
+                "depends_on": depends_on
             })
 
-        optional_prompts.sort(key=lambda d: (d["order"] is None, d["order"] or 0))
-        seen = {p["field_name"] for p in optional_prompts}
-        field_prompts_array = list(optional_prompts)
+            seen.add(name)
 
         for field_doc in field_docs:
             field_name = field_doc.get("field_name")
-            if field_name not in seen:
-                seen.add(field_name)
-                field_prompts_array.append({
-                    "field_name": field_name,
-                    "order": None,
-                    "description": field_doc.get("description", "")
-                })
+            if field_name in seen:
+                continue
+            depends_on = field_doc.get("depends_on") or []
 
-        lines = [
-            f"{i}. {blk['field_name']} - {blk['description']}"
-            for i, blk in enumerate(field_prompts_array, start=1)
+            if isinstance(depends_on, str):
+                depends_on = [depends_on]
+
+            items.append({
+                "field_name": field_name,
+                "order": None,
+                "description": field_doc.get("description", ""),
+                "depends_on": depends_on
+            })
+
+        explicit_orders = [item["order"] for item in items if item["order"] is not None]
+        max_order = max(explicit_orders) if explicit_orders else 0
+        default_priority = max_order + 1
+
+        priority_map = {
+            item["field_name"]: (item["order"] or default_priority)
+            for item in items
+        }
+
+        graph = defaultdict(list)
+        in_degree = {item["field_name"]: 0 for item in items}
+
+        names = set(in_degree.keys())
+        for item in items:
+            for dependency in item.get("depends_on", []):
+                if dependency in names:
+                    graph[dependency].append(item["field_name"])
+                    in_degree[item["field_name"]] += 1
+        
+        zero_queue = [
+            name for name, degree in in_degree.items() if degree == 0
         ]
 
-        field_prompts = "\n" + "\n".join(lines)
+        zero_queue.sort(key=lambda x: (priority_map[x], x))
 
-        total_prompt = master_prompt.replace("{fields}", field_prompts)
+        ordered_items = []
+
+        while zero_queue:
+            current = zero_queue.pop(0)
+            ordered_items.append(current)
+
+            for neighbor in graph[current]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    zero_queue.append(neighbor)
+            
+            zero_queue.sort(key=lambda x: (priority_map[x], x))
+
+        if len(ordered_items) < len(items):
+            leftover = names - set(ordered_items)
+            ordered_items.extend(sorted(leftover, key=lambda x: (priority_map[x], x)))
+
+        field_prompts = []
+        name_to_item = {item["field_name"]: item for item in items}
+        for idx, name in enumerate(ordered_items, start=1):
+            item = name_to_item[name]
+            field_prompts.append(f"{idx}. {item['field_name']} - {item['description']}")
+
+        total_prompt = master_prompt.replace("{fields}", "\n".join(field_prompts))
 
         return total_prompt
-
 
     # ─────────────────────────────────────────────
     # Selector Helpers
@@ -173,7 +230,7 @@ class GPTPlaywright:
                 return {}
             
         try:
-            prompt = self.get_gpt_prompts(selector_doc, "selectors")
+            prompt = self.build_gpt_prompts(selector_doc, "selectors")
 
             # Get new selectors through the router
             new_selectors = self.gpt.request_selectors(html_sample, prompt)
@@ -227,7 +284,7 @@ class GPTPlaywright:
                 self.logger.error(f"Failed to get JSON sample: {e}")
                 return {}, None
         try:
-            prompt = self.get_gpt_prompts(endpoint_doc, "endpoints")
+            prompt = self.build_gpt_prompts(endpoint_doc, "endpoints")
 
             new_keys = self.gpt.request_keys(json_sample, prompt)
 
