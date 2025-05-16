@@ -66,11 +66,6 @@ class GPTHandler:
 
 
     def preprocess_html(self, html_sample: str, preferred_model: str = None) -> str:
-        if preferred_model == self.upper_model:
-            first_limit, second_limit, backup = int(self.upper_token_limit), int(self.lower_token_limit), self.lower_model
-        else:
-            first_limit, second_limit, backup = int(self.lower_token_limit), int(self.upper_token_limit), self.upper_model
-
         soup = BeautifulSoup(html_sample, "html.parser")
         body = soup.body or soup
 
@@ -86,12 +81,11 @@ class GPTHandler:
             tag.decompose()
 
         full_html = self._minify_html(str(body))
-        full_tokens = self.count_tokens(full_html)
 
-        if full_tokens < first_limit:
-            return full_html, preferred_model
-        elif full_tokens < second_limit:
-            return full_html, backup
+        model, limit = self.model_chooser(full_html, preferred_model)
+        
+        if model:
+            return full_html, model
 
         # 3) Score the sections of the HTML
         sections = body.find_all(["section", "div", "article", "main", "aside"])
@@ -109,7 +103,7 @@ class GPTHandler:
         # Phase 3: Sort and pack
         candidates.sort(key=lambda x: x[0], reverse=True)
 
-        max_limit = max(first_limit, second_limit)
+        max_limit = limit
 
         packed_html = ""
         tokens_used = 0
@@ -125,9 +119,13 @@ class GPTHandler:
             tokens_used += snippet_tokens
 
         packed_html = self._minify_html(packed_html)
-        final_model = preferred_model if tokens_used <= first_limit else backup
+        model, limit = self.model_chooser(packed_html, preferred_model)
 
-        return packed_html, final_model
+        if model:
+            return packed_html, model
+        else:
+            self.logger.error("Failed to process HTML befor sending to GPT.")
+            return packed_html, preferred_model
     
 
     # Function to minify HTML
@@ -143,9 +141,15 @@ class GPTHandler:
 # ─────────────────────────────────────────────
 
     # Function to make a call to GPT-4 for extracting JSON keys from a JSON object
-    def request_keys(self, json_payload: str, prompt: str, model: str = None) -> dict:
+    def request_keys(self, json_payload: str, prompt: str, preferred_model: str = None) -> dict:
+        if not preferred_model:
+            preferred_model = self.lower_model
+
+        model = self.model_chooser(json_payload, preferred_model)[0]
+
         if not model:
-            model = self.lower_model
+            self.logger.warning("Failed to choose a model for JSON key extraction.")
+            model = preferred_model
 
         try:
             system_prompt = """You are an expert web scraper using GPT. You have just received a JSON payload from a web API. Your task is to extract the relevant keys from the JSON object.
@@ -201,6 +205,7 @@ class GPTHandler:
 # Token Counting functions
 # ─────────────────────────────────────────────
 
+    # Function to count the tokens in a text
     def count_tokens(self, text: str, model: str = None) -> int:
         if not model:
             model = self.upper_model
@@ -210,3 +215,20 @@ class GPTHandler:
             encoding = tiktoken.get_encoding("cl100k_base")
 
         return len(encoding.encode(text))
+    
+
+    # Function to choose the best model based on the token count
+    def model_chooser(self, text: str, preferred_model: str = None) -> str:
+        if preferred_model == self.upper_model:
+            first_limit, second_limit, backup = int(self.upper_token_limit), int(self.lower_token_limit), self.lower_model
+        else:
+            first_limit, second_limit, backup = int(self.lower_token_limit), int(self.upper_token_limit), self.upper_model
+
+        full_tokens = self.count_tokens(text)
+
+        if full_tokens < first_limit:
+            return preferred_model, first_limit
+        elif full_tokens < second_limit:
+            return backup, second_limit
+        else:
+            return None, max(first_limit, second_limit)
