@@ -487,7 +487,11 @@ class PlaywrightManager:
         for endpoint, listener in listeners:
             try:
                 response = listener.value
-                responses[endpoint] = response.json()
+                content_type = response.headers.get("content-type", "").lower()
+                if "application/json" in content_type:
+                    responses[endpoint] = response.json()
+                else:
+                    responses[endpoint] = response.text
             except PlaywrightTimeoutError:
                 self.logger.error(f"Timeout waiting for {endpoint}")
                 responses[endpoint] = None
