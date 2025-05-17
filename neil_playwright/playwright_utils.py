@@ -1,3 +1,5 @@
+from neil_logger import UniversalLogger
+from neil_data_utils import DataUtils
 import platform
 import json
 import time
@@ -14,17 +16,19 @@ from datetime import datetime, timedelta
 import re
 import ast
 from html_similarity import style_similarity
-from neil_logger import UniversalLogger
+from types import SimpleNamespace
+
 
 
 class PlaywrightManager:
     def __init__(self, config = None, logger: UniversalLogger = None):
-        self.logger = logger or print
+        self.logger = logger or SimpleNamespace(info = print, warning = print, error = print, debug = print)
         self.configuration = self._load_config(config)
         self.chrome_path = self.configuration.get("CHROME_PATH") or self.get_default_chrome_path()
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
         self.extension_path = self.configuration.get("EXTENSION_PATH", None)
+        self.data_utils = DataUtils(logger=self.logger)
 
 
     def launch_playwright(self, mode: str = "desktop", persist_session: bool = False, context_id: str = "default", headless: bool = False):
@@ -500,7 +504,7 @@ class PlaywrightManager:
                     json_match = self.extract_json_from_html(html)
                     endpoint_nests = endpoint.split(" > ")
                     for nest in endpoint_nests:
-                        json_match = self.find_json_by_string(json_match, nest)
+                        json_match = self.data_utils.find_json_by_string(json_match, nest)
                     responses[endpoint] = json_match if json_match else html
                 else:
                     responses[endpoint] = response.text()
@@ -728,33 +732,4 @@ class PlaywrightManager:
         return results
     
 
-    # Function to identify JSON blob with search string
-    def find_json_by_string(self, json_list: list[Any], search: str) -> Any | None:
-        if isinstance(json_list, dict):
-            json_list = [json_list]
-        
-        for blob in json_list:
-            val = self.deep_find_search(blob, search)
-            if val is not None:
-                return val
-            
-        return None
-    
 
-    # Function to find a value in a nested object
-    def deep_find_search(self, obj: Any, search: str) -> Any | None:
-        if isinstance(obj, dict):
-            for key, value in obj.items():
-                if search in key:
-                    return value
-                found = self.deep_find_search(value, search)
-                if found is not None:
-                    return found
-                
-        elif isinstance(obj, list):
-            for item in obj:
-                found = self.deep_find_search(item, search)
-                if found is not None:
-                    return found
-                
-        return None

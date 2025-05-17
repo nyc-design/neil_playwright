@@ -1,6 +1,6 @@
+from neil_logger import UniversalLogger
 import random
 import requests
-from neil_logger import UniversalLogger
 import json
 import os
 

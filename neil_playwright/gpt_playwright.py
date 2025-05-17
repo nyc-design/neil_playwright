@@ -1,4 +1,5 @@
 from neil_logger import UniversalLogger
+from neil_data_utils import DataUtils
 from .gpt_utils import GPTHandler
 import imaplib
 from datetime import datetime
@@ -10,11 +11,13 @@ from pymongo.database import Database
 from collections import defaultdict
 from flatten_json import flatten
 import json
+from types import SimpleNamespace
 
 
 class GPTPlaywright:
     def __init__(self, api_key: str = None, config = None, playwright_manager: PlaywrightManager = None, db: Database = None, logger: UniversalLogger = None):
-        self.logger = logger or print
+        self.logger = logger or SimpleNamespace(info = print, warning = print, error = print, debug = print)
+        self.data_utils = DataUtils(logger = self.logger)
         self.gpt = GPTHandler(api_key, config, logger)
         self.playwright_manager = playwright_manager
         self.db = db
@@ -66,12 +69,13 @@ class GPTPlaywright:
 
 
     # Function to update JSON keys for a specific category in the database
-    def update_keys_in_db(self, endpoint_name: str, new_keys: dict) -> None:
+    def update_keys_in_db(self, endpoint_name: str, new_keys: dict, sample_json: dict) -> None:
         self.endpoints_db.update_one(
             {"name": endpoint_name},
             {
                 "$set": {
                     "keys": new_keys,
+                    "sample_json": sample_json,
                     "timestamp": datetime.now()
                 }
             },
@@ -204,6 +208,11 @@ class GPTPlaywright:
         if selector_doc and selector_doc.get("selectors") and (datetime.now() - selector_doc.get("timestamp", datetime.min)).days < 7 and not force_update:
             self.logger.info(f"Using cached selectors for category: {category}")
             return selector_doc.get("selectors", {})
+        elif not selector_doc:
+            self.logger.error(f"No selector doc found for category: {category}")
+            return {}
+          
+        old_selectors = selector_doc.get("selectors", {})
             
         # If no HTML sample provided, get the default URLs for the category
         if not html_sample:
@@ -239,6 +248,15 @@ class GPTPlaywright:
             
             # Update the database with new selectors
             if new_selectors:
+                if old_selectors:
+                    compare_selectors = self.data_utils.compare_jsons(old_selectors, new_selectors, compare_values = True)
+                else:
+                    compare_selectors = None
+
+                if compare_selectors and compare_selectors["percent_change"] > 10:
+                    self.logger.error(f"[{category}] schema shift: +{len(compare_selectors['added'])}/-{len(compare_selectors['removed'])} "
+                    f"(pct {compare_selectors['pct_change']:.1f}%) • added={compare_selectors['added']} • removed={compare_selectors['removed']}")
+
                 self.update_selectors_in_db(category, new_selectors)
             
             self.logger.info(f"New selectors generated for category: {category}")
@@ -257,7 +275,7 @@ class GPTPlaywright:
     def get_keys(self, endpoint_name: str, json_sample: str = None, force_update: bool = False) -> dict:
         endpoint_doc = self.get_endpoint_doc_from_db(endpoint_name)
 
-        if endpoint_doc and (datetime.now() - endpoint_doc.get("timestamp", datetime.min)).days < 7 and not force_update:
+        if endpoint_doc and endpoint_doc.get("keys") and (datetime.now() - endpoint_doc.get("timestamp", datetime.min)).days < 7 and not force_update:
             self.logger.info(f"Using cached keys for endpoint: {endpoint_name}")
             return endpoint_doc.get("keys", {}), endpoint_doc.get("endpoint_query", None)
         elif not endpoint_doc:
@@ -265,6 +283,9 @@ class GPTPlaywright:
             return {}, None
         
         endpoint = endpoint_doc.get("endpoint_query", None)
+
+        old_keys = endpoint_doc.get("keys", {})
+        old_json = endpoint_doc.get("sample_json", None)
         
         if not json_sample:
             try:
@@ -288,14 +309,27 @@ class GPTPlaywright:
         try:
             prompt = self.build_gpt_prompts(endpoint_doc, "endpoints")
 
-            flattened_json = flatten(json_sample, separator = ".")
+            flattened_json = self.data_utils.flatten_json(json_sample)
             
             json_payload = json.dumps(flattened_json, separators = (",", ":"))
 
             new_keys = self.gpt.request_keys(json_payload, prompt)
 
             if new_keys:
-                self.update_keys_in_db(endpoint_name, new_keys)
+                if old_keys:
+                    compare_keys = self.data_utils.compare_jsons(old_keys, new_keys, compare_values = True)
+                else:
+                    compare_keys = None
+                if old_json:
+                    compare_jsons = self.data_utils.compare_jsons(old_json, flattened_json)
+                else:
+                    compare_jsons = None
+                
+                if ((compare_keys and compare_keys["percent_change"] > 10) or (compare_jsons and compare_jsons["percent_change"] > 10)):
+                    self.logger.error(f"[{endpoint_name}] schema shift: +{len(compare_keys['added'])}/-{len(compare_keys['removed'])} "
+                    f"(pct {compare_keys['pct_change']:.1f}%) • added={compare_keys['added']} • removed={compare_keys['removed']}")
+
+                self.update_keys_in_db(endpoint_name, new_keys, flattened_json)
 
             self.logger.info(f"New keys generated for endpoint: {endpoint_name}")
             return new_keys, endpoint
@@ -305,6 +339,24 @@ class GPTPlaywright:
             return {}, None
 
 
+    #Function to compare JSON response changes
+    def compare_json_responses(self, endpoint_name: str, json_response: dict, threshold: float = 50) -> bool:
+        endpoint_doc = self.get_endpoint_doc_from_db(endpoint_name)
+
+        if not endpoint_doc:
+            self.logger.error(f"No endpoint doc found for endpoint: {endpoint_name}")
+            return {}
+        
+        old_json = endpoint_doc.get("sample_json", {})
+
+        new_json = self.data_utils.flatten_json(json_response)
+
+        comparison = self.data_utils.compare_jsons(old_json, new_json)
+
+        if comparison and comparison["percent_change"] > threshold:
+            return True
+        else:
+            return False
 
 # ─────────────────────────────────────────────
 # Verification detection and handling

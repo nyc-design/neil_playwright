@@ -16,12 +16,12 @@ dependencies = [
     "cssselect==1.2.0",
     "html-similarity>=0.1.3",
     "python-ghost-cursor>=0.1.1",
-    "flatten-json>=0.1.14",
     "patchright>=0.0.7",
     "tiktoken>=0.5.1",
     "bs4",
     "requests",
     "tldextract",
     "openai>=1.3.5",
-    "neil-logger @ git+https://github.com/nyc-design/neil_logger.git"
+    "neil-logger @ git+https://github.com/nyc-design/neil_logger.git",
+    "neil_data_utils @ git+https://github.com/nyc-design/neil_data_utils.git"
 ]

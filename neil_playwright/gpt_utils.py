@@ -1,11 +1,11 @@
+from neil_logger import UniversalLogger
 from openai import OpenAI
 import tiktoken
 import json
 from bs4 import BeautifulSoup
 import re
-from neil_logger import UniversalLogger
 import os
-
+from types import SimpleNamespace
 
 # ─────────────────────────────────────────────
 # GPT Selectors Class
@@ -13,7 +13,7 @@ import os
 
 class GPTHandler:
     def __init__(self, api_key: str = None, config = None, logger: UniversalLogger = None):
-        self.logger = logger or print
+        self.logger = logger or SimpleNamespace(info = print, warning = print, error = print, debug = print)
         configuration = self._load_config(config)
         self.upper_model = configuration.get("upper_model", {}).get("name")
         self.lower_model = configuration.get("lower_model", {}).get("name")
