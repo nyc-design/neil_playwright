@@ -7,7 +7,9 @@ import re
 import math
 from .playwright_utils import PlaywrightManager
 from pymongo.database import Database
-from collections import defaultdict, deque
+from collections import defaultdict
+from flatten_json import flatten
+import json
 
 
 class GPTPlaywright:
@@ -286,7 +288,11 @@ class GPTPlaywright:
         try:
             prompt = self.build_gpt_prompts(endpoint_doc, "endpoints")
 
-            new_keys = self.gpt.request_keys(json_sample, prompt)
+            flattened_json = flatten(json_sample, separator = ".")
+            
+            json_payload = json.dumps(flattened_json, separators = (",", ":"))
+
+            new_keys = self.gpt.request_keys(json_payload, prompt)
 
             if new_keys:
                 self.update_keys_in_db(endpoint_name, new_keys)

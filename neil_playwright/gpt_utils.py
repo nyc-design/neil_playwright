@@ -152,9 +152,11 @@ class GPTHandler:
             model = preferred_model
 
         try:
-            system_prompt = """You are an expert web scraper using GPT. You have just received a JSON payload from a web API. Your task is to extract the relevant keys from the JSON object.
+            system_prompt = """You are an expert web scraper using GPT. You have just received a flattened JSON payload from a web API. Your task is to extract the relevant keys / paths for various elements from the JSON object.
 - Return your response as **valid minified JSON**, with all attribute values wrapped in **single quotes** inside double-quoted strings, to prevent escaping issues.
 - Do not include comments or extra explanation.
+- if an element is nested within other keys, return the full path to that element in dot notation (i.e. key1.key2.key3).
+- if a path involves a list, return "numbered_list" as the key for that level (i.e. key1.key2.numbered_list.key3). In the case that the list is a single element, return "0" for that level (i.e. key1.key2.0.key3).
 - If you cannot find the elements in the provided JSON, return an empty JSON object {}."""
 
             response = self.client.responses.create(
@@ -218,7 +220,10 @@ class GPTHandler:
     
 
     # Function to choose the best model based on the token count
-    def model_chooser(self, text: str, preferred_model: str = None) -> str:
+    def model_chooser(self, text: str | dict, preferred_model: str = None) -> str:
+        if isinstance(text, dict):
+            text = json.dumps(text, separators = (",", ":"))
+
         if preferred_model == self.upper_model:
             first_limit, second_limit, backup = int(self.upper_token_limit), int(self.lower_token_limit), self.lower_model
         else:

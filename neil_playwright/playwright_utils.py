@@ -3,7 +3,7 @@ import json
 import time
 import random
 import os
-from typing import Optional
+from typing import Optional, Any
 from pathlib import Path
 from patchright.sync_api import sync_playwright, Page, expect, Locator, TimeoutError as PlaywrightTimeoutError
 from python_ghost_cursor.playwright_sync import create_cursor
@@ -464,8 +464,8 @@ class PlaywrightManager:
 
         try:
             for endpoint in endpoints:
-                endpoint_parts = endpoint.split(" {+} ") if " {+} " in endpoint else [endpoint]
-                endpoint_parts = [part.split(" > ")[0] for part in endpoint_parts]
+                header_search = endpoint.split(" > ")[0] if " > " in endpoint else endpoint
+                endpoint_parts = header_search.split(" {+} ") if " {+} " in header_search else [header_search]
                 if method == "click_new_tab":
                     ctx = self.context.expect_event(
                         "response",
@@ -497,9 +497,10 @@ class PlaywrightManager:
                     responses[endpoint] = response.json()
                 elif "text/html" in content_type:
                     html = response.text()
-                    json_blobs = self.extract_json_from_html(html)
-                    json_search = endpoint.split(" > ")[-1] if " > " in endpoint else endpoint
-                    json_match = self.find_json_by_string(json_blobs, json_search)
+                    json_match = self.extract_json_from_html(html)
+                    endpoint_nests = endpoint.split(" > ")
+                    for nest in endpoint_nests:
+                        json_match = self.find_json_by_string(json_match, nest)
                     responses[endpoint] = json_match if json_match else html
                 else:
                     responses[endpoint] = response.text()
@@ -714,6 +715,8 @@ class PlaywrightManager:
         for tag in re.finditer(r'<script[^>]*>(.*?)</script>', html, re.S):
             for match in re.finditer(r'\{[^{}]*\}', tag.group(1)):
                 blob = match.group(0)
+                if ":" not in blob:
+                    continue
                 try:
                     results.append(json.loads(blob))
                 except json.JSONDecodeError:
@@ -726,15 +729,32 @@ class PlaywrightManager:
     
 
     # Function to identify JSON blob with search string
-    def find_json_by_string(self, jsons: list[dict], search: str) -> dict | None:
-        matches = []
-        for json in jsons:
-            try:
-                text = json.dumps(json)
-            except (TypeError, ValueError):
-                continue
-            
-            if search in text:
-                matches.append(json)
+    def find_json_by_string(self, json_list: list[Any], search: str) -> Any | None:
+        if isinstance(json_list, dict):
+            json_list = [json_list]
         
-        return matches[0] if matches else None
+        for blob in json_list:
+            val = self.deep_find_search(blob, search)
+            if val is not None:
+                return val
+            
+        return None
+    
+
+    # Function to find a value in a nested object
+    def deep_find_search(self, obj: Any, search: str) -> Any | None:
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if search in key:
+                    return value
+                found = self.deep_find_search(value, search)
+                if found is not None:
+                    return found
+                
+        elif isinstance(obj, list):
+            for item in obj:
+                found = self.deep_find_search(item, search)
+                if found is not None:
+                    return found
+                
+        return None
