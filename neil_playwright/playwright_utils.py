@@ -465,6 +465,7 @@ class PlaywrightManager:
         try:
             for endpoint in endpoints:
                 endpoint_parts = endpoint.split(" {+} ") if " {+} " in endpoint else [endpoint]
+                endpoint_parts = [part.split(" > ")[0] for part in endpoint_parts]
                 if method == "click_new_tab":
                     ctx = self.context.expect_event(
                         "response",
@@ -497,7 +498,9 @@ class PlaywrightManager:
                 elif "text/html" in content_type:
                     html = response.text()
                     json_blobs = self.extract_json_from_html(html)
-                    responses[endpoint] = json_blobs if json_blobs else html
+                    json_search = endpoint.split(" > ")[-1] if " > " in endpoint else endpoint
+                    json_match = self.find_json_by_string(json_blobs, json_search)
+                    responses[endpoint] = json_match if json_match else html
                 else:
                     responses[endpoint] = response.text()
             except PlaywrightTimeoutError:
@@ -720,4 +723,18 @@ class PlaywrightManager:
                         pass
         
         return results
+    
 
+    # Function to identify JSON blob with search string
+    def find_json_by_string(self, jsons: list[dict], search: str) -> dict | None:
+        matches = []
+        for json in jsons:
+            try:
+                text = json.dumps(json)
+            except (TypeError, ValueError):
+                continue
+            
+            if search in text:
+                matches.append(json)
+        
+        return matches[0] if matches else None
