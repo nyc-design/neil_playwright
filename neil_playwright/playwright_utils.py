@@ -12,7 +12,7 @@ import requests
 from contextlib import contextmanager, ExitStack
 from datetime import datetime, timedelta
 import re
-import time
+import ast
 from html_similarity import style_similarity
 from neil_logger import UniversalLogger
 
@@ -494,6 +494,10 @@ class PlaywrightManager:
                 content_type = response.headers.get("content-type", "").lower()
                 if "application/json" in content_type:
                     responses[endpoint] = response.json()
+                elif "text/html" in content_type:
+                    html = response.text()
+                    json_blobs = self.extract_json_from_html(html)
+                    responses[endpoint] = json_blobs if json_blobs else html
                 else:
                     responses[endpoint] = response.text()
             except PlaywrightTimeoutError:
@@ -681,4 +685,39 @@ class PlaywrightManager:
         except Exception as e:
             self.logger.error(f"Screenshot failed: {e}")
 
+    # ─────────────────────────────────────────────
+    # JSON Extraction Helpers
+    # ─────────────────────────────────────────────
+
+    # Function to extract JSON data from a response
+    def extract_json_from_html(self, html: str) -> list:
+        results = []
+
+        for match in re.finditer(r'<script[^>]+type="application/json"[^>]*>(.*?)</script>', html, re.S):
+            text = match.group(1).strip()
+            try:
+                results.append(json.loads(text))
+            except json.JSONDecodeError:
+                pass
+        
+        match = re.search(r'<script[^>]+id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+        if match:
+            text = match.group(1).strip()
+            try:
+                results.append(json.loads(text))
+            except json.JSONDecodeError:
+                pass
+        
+        for tag in re.finditer(r'<script[^>]*>(.*?)</script>', html, re.S):
+            for match in re.finditer(r'\{[^{}]*\}', tag.group(1)):
+                blob = match.group(0)
+                try:
+                    results.append(json.loads(blob))
+                except json.JSONDecodeError:
+                    try:
+                        results.append(ast.literal_eval(blob))
+                    except Exception:
+                        pass
+        
+        return results
 
