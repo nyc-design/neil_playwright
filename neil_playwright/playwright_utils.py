@@ -203,7 +203,7 @@ class PlaywrightManager:
     # ─────────────────────────────────────────────
 
     # Function to load a page with retries
-    def load_page(self, given_method: str, locator: str | Locator, tests: str | list[str], *, hover_and_click: bool = True, human_cursor: bool = True, endpoints: Optional[list[str]] = None, retries: int = 3, timeout: float = 30.0) -> tuple[Page, Optional[dict[str, Optional[dict]]]]:
+    def load_page(self, given_method: str, locator: str | Locator, tests: str | list[str], *, hover_and_click: bool = True, human_cursor: bool = True, endpoints: Optional[list[str]] | str = None, retries: int = 3, timeout: float = 30.0) -> tuple[Page, Optional[dict[str, Optional[dict]]]]:
         current_url = self.page.url  # Store current URL
         before_html = self.page.inner_html("body")
         method = given_method
@@ -389,7 +389,7 @@ class PlaywrightManager:
     
     # Function to click open a new tab in a with block
     @contextmanager
-    def new_tab(self, locator: str | Locator, tests: str | list[str], *, hover_and_click: bool = True, human_cursor: bool = True, endpoints: Optional[list[str]] = None, retries: int = 3, timeout: float = 30.0):
+    def new_tab(self, locator: str | Locator, tests: str | list[str], *, hover_and_click: bool = True, human_cursor: bool = True, endpoints: Optional[list[str]] | str = None, retries: int = 3, timeout: float = 30.0):
         try:
             page, responses = self.load_page("click_new_tab", locator, tests, hover_and_click = hover_and_click, human_cursor = human_cursor, endpoints = endpoints, retries = retries, timeout = timeout)
 
@@ -455,9 +455,13 @@ class PlaywrightManager:
 
     @contextmanager
     # Function to begin the API response listeners
-    def expect_responses(self, endpoints: list[str], method: str, timeout: float):
+    def expect_responses(self, endpoints: list[str] | str, method: str, timeout: float):
         stack = ExitStack()
         listeners = []
+
+        if isinstance(endpoints, str):
+            endpoints = [endpoints]
+
         try:
             for endpoint in endpoints:
                 endpoint_parts = endpoint.split(" {+} ") if " {+} " in endpoint else [endpoint]
