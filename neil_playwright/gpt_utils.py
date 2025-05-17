@@ -224,7 +224,7 @@ class GPTHandler:
         else:
             first_limit, second_limit, backup = int(self.lower_token_limit), int(self.upper_token_limit), self.upper_model
 
-        full_tokens = self.count_tokens(text)
+        full_tokens = self.count_tokens(text, preferred_model)
 
         if full_tokens < first_limit:
             return preferred_model, first_limit

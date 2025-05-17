@@ -491,7 +491,7 @@ class PlaywrightManager:
                 if "application/json" in content_type:
                     responses[endpoint] = response.json()
                 else:
-                    responses[endpoint] = response.text
+                    responses[endpoint] = response.text()
             except PlaywrightTimeoutError:
                 self.logger.error(f"Timeout waiting for {endpoint}")
                 responses[endpoint] = None
