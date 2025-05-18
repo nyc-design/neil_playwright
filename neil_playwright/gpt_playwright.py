@@ -255,7 +255,7 @@ class GPTPlaywright:
 
                 if compare_selectors and compare_selectors["percent_change"] > 10:
                     self.logger.error(f"[{category}] schema shift: +{len(compare_selectors['added'])}/-{len(compare_selectors['removed'])} "
-                    f"(pct {compare_selectors['pct_change']:.1f}%) • added={compare_selectors['added']} • removed={compare_selectors['removed']}")
+                    f"(pct {compare_selectors['percent_change']:.1f}%) • added={compare_selectors['added']} • removed={compare_selectors['removed']}")
 
                 self.update_selectors_in_db(category, new_selectors)
             
@@ -327,7 +327,7 @@ class GPTPlaywright:
                 
                 if ((compare_keys and compare_keys["percent_change"] > 10) or (compare_jsons and compare_jsons["percent_change"] > 10)):
                     self.logger.error(f"[{endpoint_name}] schema shift: +{len(compare_keys['added'])}/-{len(compare_keys['removed'])} "
-                    f"(pct {compare_keys['pct_change']:.1f}%) • added={compare_keys['added']} • removed={compare_keys['removed']}")
+                    f"(pct {compare_keys['percent_change']:.1f}%) • added={compare_keys['added']} • removed={compare_keys['removed']}")
 
                 self.update_keys_in_db(endpoint_name, new_keys, flattened_json)
 
