@@ -156,7 +156,7 @@ class GPTHandler:
 - Return your response as **valid minified JSON**, with all attribute values wrapped in **single quotes** inside double-quoted strings, to prevent escaping issues.
 - Do not include comments or extra explanation.
 - if an element is nested within other keys, return the full path to that element in dot notation (i.e. key1.key2.key3).
-- if a path involves a list, return "numbered_list" as the key for that level (i.e. key1.key2.numbered_list.key3). In the case that the list is a single element, return "0" for that level (i.e. key1.key2.0.key3).
+- if a path involves a list or multiple lists, return "numbered_list" as the key for each level where a list is present (i.e. key1.key2.numbered_list.key3.numbered_list.key4). In the case that the list is a single element, return "0" for that level (i.e. key1.key2.0.key3).
 - If you cannot find the elements in the provided JSON, return an empty JSON object {}."""
 
             response = self.client.responses.create(
