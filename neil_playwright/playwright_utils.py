@@ -498,7 +498,7 @@ class PlaywrightManager:
                 elif "text/html" in content_type:
                     html = response.text()
                     json_match = self.extract_json_from_html(html)
-                    endpoint_nests = endpoint.split(" {>} ")
+                    endpoint_nests = endpoint.split(" {>} ")[1:]
                     for nest in endpoint_nests:
                         json_match = self.data_utils.find_json_by_string(json_match, nest)
                     responses[endpoint] = json_match if json_match else html
