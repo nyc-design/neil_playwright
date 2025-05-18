@@ -17,6 +17,7 @@ import re
 import ast
 from html_similarity import style_similarity
 from types import SimpleNamespace
+from urllib.parse import urlparse
 
 
 
@@ -468,19 +469,14 @@ class PlaywrightManager:
 
         try:
             for endpoint in endpoints:
-                header_search = endpoint.split(" > ")[0] if " > " in endpoint else endpoint
+                source, search_string = endpoint.split(" {:} ", 1) if " {:} " in endpoint else (None, endpoint)
+                header_search = search_string.split(" {>} ")[0] if " {>} " in search_string else search_string
                 endpoint_parts = header_search.split(" {+} ") if " {+} " in header_search else [header_search]
+                predicate = lambda r, ep=endpoint_parts, src=source: (r.status == 200 and (urlparse(r.url).netloc.find(src) != -1 if src else True) and all(part in r.url for part in ep))
                 if method == "click_new_tab":
-                    ctx = self.context.expect_event(
-                        "response",
-                        lambda r, ep=endpoint_parts: all(part in r.url for part in ep) and r.status == 200,
-                        timeout=timeout * 2 * 1000
-                    )
+                    ctx = self.context.expect_event("response", predicate, timeout=timeout * 2 * 1000)
                 else:
-                    ctx = self.page.expect_response(
-                        lambda r, ep=endpoint_parts: all(part in r.url for part in ep) and r.status == 200,
-                        timeout=timeout * 2 * 1000
-                    )
+                    ctx = self.page.expect_response(predicate, timeout=timeout * 2 * 1000)
                 listeners.append((endpoint, stack.enter_context(ctx)))
 
             yield listeners
@@ -502,7 +498,7 @@ class PlaywrightManager:
                 elif "text/html" in content_type:
                     html = response.text()
                     json_match = self.extract_json_from_html(html)
-                    endpoint_nests = endpoint.split(" > ")
+                    endpoint_nests = endpoint.split(" {>} ")
                     for nest in endpoint_nests:
                         json_match = self.data_utils.find_json_by_string(json_match, nest)
                     responses[endpoint] = json_match if json_match else html
