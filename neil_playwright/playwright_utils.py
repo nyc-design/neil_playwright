@@ -5,7 +5,7 @@ import json
 import time
 import random
 import os
-from typing import Optional, Any
+from typing import Optional, Any, Callable
 from pathlib import Path
 from patchright.sync_api import sync_playwright, Page, expect, Locator, TimeoutError as PlaywrightTimeoutError
 from python_ghost_cursor.playwright_sync import create_cursor
@@ -266,10 +266,9 @@ class PlaywrightManager:
         elif method == "click_new_tab":
             if hover_and_click:
                 self.scroll_and_hover(locator, human_cursor)
-            new_page = self.click_new_tab(locator)
+            new_page = self.click_new_tab(locator, human_cursor)
             if not new_page:
                 raise RuntimeError(f"Failed to open new tab for {locator}")
-            self.reset_page(new_page)
             self.page.wait_for_load_state("load")
             self.page.wait_for_url(lambda url: url != current_url)
         elif method == "enter_button":
@@ -342,21 +341,24 @@ class PlaywrightManager:
     
 
     # Function to help with clicking element and opening new tab
-    def click_new_tab(self, locator: str | Locator):
+    def click_new_tab(self, locator: str | Locator, human_cursor: bool = True):
         href = locator.get_attribute("href")
 
         if not href:
             self.logger.warning(f"No href found for selector: {locator}")
             return None
     
-        with self.context.expect_page() as new_page_info:
+        with self.page.expect_popup() as popup_info:
             if self.mode == "mobile":
                 self.page.evaluate(f"window.open('{href}', '_blank')")
             else:
-                locator.click(modifiers=["ControlOrMeta"])
+                locator.evaluate("el => el.setAttribute('target','_blank')")
+                self.click_locator(locator, human_cursor = human_cursor)
         
-        new_tab = new_page_info.value
+        new_tab = popup_info.value
         self.logger.info(f"Opened new tab")
+
+        self.reset_page(new_tab)
 
         return new_tab
     
@@ -522,6 +524,17 @@ class PlaywrightManager:
     # Human Mimic Helpers
     # ─────────────────────────────────────────────
 
+    # Function to wait for a predicate to be true
+    def wait_for(self, predicate: Callable, timeout: float = 10.0, poll_interval: float = 0.5, error_message: str = "Predicate not met after {timeout} seconds"):
+        end_time = datetime.now() + timedelta(seconds=timeout)
+        while datetime.now() < end_time:
+            if predicate():
+                return
+            self.page.wait_for_timeout(poll_interval * 1000)
+
+        raise RuntimeError(error_message.format(timeout=timeout))
+    
+
     # Function to mimic a micro delay
     def micro_delay(self, min_delay = 0.01, max_delay = 0.05):
         delay = round(random.uniform(min_delay, max_delay), 2)
@@ -545,13 +558,13 @@ class PlaywrightManager:
 
 
     # Function to click a locator for navigation
-    def click_locator(self, locator: Locator, human_cursor: bool = True):
+    def click_locator(self, locator: Locator, human_cursor: bool = True, modifier: str = None):
         if self.mode == "mobile":
             locator.tap()
         elif human_cursor:
-            self.cursor_click(locator)
+            self.cursor_click(locator, modifier)
         else:
-            locator.click()
+            locator.click(modifiers=modifier)
         self.human_delay()
     
 
@@ -562,9 +575,13 @@ class PlaywrightManager:
 
     
     # Function to click locator with cursor
-    def cursor_click(self, locator: Locator):
+    def cursor_click(self, locator: Locator, modifier: str = None):
         element = locator.element_handle()
+        if modifier:
+            self.page.keyboard.down(modifier)
         self.cursor.click(element)
+        if modifier:
+            self.page.keyboard.up(modifier)
 
     
     #Function to mimic page scrolling to element
