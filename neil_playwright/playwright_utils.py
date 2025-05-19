@@ -90,14 +90,19 @@ class PlaywrightManager:
         # Get context args (sets self.abm.geo, user_agent, proxy)
         context_args = self.abm.get_playwright_context(self.playwright.devices)
 
-        args=["--no-sandbox","--disable-dev-shm-usage"]
-        
+        args = []
+
+        if incognito:
+            args.append("--incognito")
         if self.profile_name:
             args.append(f"--profile-directory={self.profile_name}")
         if self.extension_path:
             args.append(f"--load-extension={self.get_extension_paths()}")
-        if incognito:
-            args.append("--incognito")
+
+        args.append("--no-first-run")
+        args.append("--no-default-browser-check")
+        args.append("--disable-dev-shm-usage")
+        args.append("--disable-features=ProfilePicker")
 
         context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
@@ -116,10 +121,15 @@ class PlaywrightManager:
 
         context_args = self.abm.get_playwright_context(self.playwright.devices)
 
-        args=["--no-sandbox","--disable-dev-shm-usage"]
+        args = []
 
         if incognito:
             args.append("--incognito")
+
+        args.append("--no-first-run")
+        args.append("--no-default-browser-check")
+        args.append("--disable-dev-shm-usage")
+        args.append("--disable-features=ProfilePicker")
 
         context = self.playwright.chromium.launch_persistent_context(
             headless=headless,
