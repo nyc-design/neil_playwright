@@ -32,7 +32,7 @@ class PlaywrightManager:
         self.data_utils = DataUtils(logger=self.logger)
 
 
-    def launch_playwright(self, mode: str = "desktop", persist_session: bool = False, context_id: str = "default", headless: bool = False):
+    def launch_playwright(self, mode: str = "desktop", persist_session: bool = False, context_id: str = "default", headless: bool = False, incognito: bool = False):
         self.mode = mode
         self.persist_session = persist_session
         self.context_id = context_id
@@ -40,7 +40,7 @@ class PlaywrightManager:
         self.abm = AntiBotManager(mode=self.mode, config=self.configuration, logger=self.logger)
     
         self.playwright = sync_playwright().start()
-        self.context = self._init_context(headless)
+        self.context = self._init_context(headless, incognito)
         self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
         self.master_tab = self.page
         self.cursor = create_cursor(self.page)
@@ -82,7 +82,7 @@ class PlaywrightManager:
     # ─────────────────────────────────────────────
 
     # Helper function to launch context for desktop mode
-    def _launch_desktop_context(self, headless: bool):
+    def _launch_desktop_context(self, headless: bool, incognito: bool):
         profile_dir = self.profile_path if self.persist_session and self.profile_path else "/tmp/default-chrome-profile"
 
         self.logger.info(f"[DESKTOP MODE] Launching Chrome with {'persistent session' if self.persist_session else 'ephemeral session'} at: {profile_dir}")
@@ -96,6 +96,8 @@ class PlaywrightManager:
             args.append(f"--profile-directory={self.profile_name}")
         if self.extension_path:
             args.append(f"--load-extension={self.get_extension_paths()}")
+        if incognito:
+            args.append("--incognito")
 
         context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
@@ -109,26 +111,32 @@ class PlaywrightManager:
     
 
     # Helper function to launch context for mobile mode
-    def _launch_mobile_context(self, headless: bool):
+    def _launch_mobile_context(self, headless: bool, incognito: bool):
         self.logger.info("[MOBILE MODE] Launching real Chrome in ephemeral mobile context.")
 
         context_args = self.abm.get_playwright_context(self.playwright.devices)
 
+        args=["--no-sandbox","--disable-dev-shm-usage"]
+
+        if incognito:
+            args.append("--incognito")
+
         context = self.playwright.chromium.launch_persistent_context(
             headless=headless,
             executable_path=self.chrome_path,
-            args=context_args
+            args=args,
+            **context_args
         )
 
         return context
 
 
     # Helper function to initialize the context based on mode
-    def _init_context(self, headless: bool) -> any:
+    def _init_context(self, headless: bool, incognito: bool) -> any:
         if self.mode == "desktop":
-            return self._launch_desktop_context(headless)
+            return self._launch_desktop_context(headless, incognito)
         else:
-            return self._launch_mobile_context(headless)
+            return self._launch_mobile_context(headless, incognito)
 
 
     def save_session(self):
