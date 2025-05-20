@@ -17,7 +17,11 @@ import re
 import ast
 from html_similarity import style_similarity
 from types import SimpleNamespace
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
+from bs4 import BeautifulSoup
+from google.cloud import storage
+from pathlib import Path
+import uuid
 
 
 
@@ -29,6 +33,9 @@ class PlaywrightManager:
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
         self.extension_path = self.configuration.get("EXTENSION_PATH", None)
+        self.should_screenshot_errors = self.configuration.get("ERROR_SCREENSHOTS", False)
+        self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOT_PATH", "screenshots/errors")
+        
         self.data_utils = DataUtils(logger=self.logger)
 
 
@@ -63,7 +70,8 @@ class PlaywrightManager:
                 except Exception as e:
                     self.logger.warning(f"Failed to stop Playwright cleanly: {e}")
         except Exception as final_error:
-            self.logger.error(f"Unexpected error during shutdown: {final_error}")
+            screenshot_path = self.screenshot_on_error(final_error)
+            self.logger.error(f"Unexpected error during shutdown: {final_error}. Screenshot saved to {screenshot_path}")
 
     
     def _load_config(self, config: str):
@@ -230,6 +238,7 @@ class PlaywrightManager:
         current_url = self.page.url  # Store current URL
         before_html = self.page.inner_html("body")
         method = given_method
+        e = None
 
         for attempt in range(retries):
             try:
@@ -254,8 +263,10 @@ class PlaywrightManager:
                 self.logger.error(f"Wrong method passed to load_page: {method}")
                 break
             
-            except Exception as e:
-                self.logger.warning(f"Navigation failed for {locator} on attempt {attempt + 1}: {e}")
+            except Exception as ex:
+                e = ex
+                screenshot_path = self.screenshot_on_error(e)
+                self.logger.warning(f"Navigation failed for {locator} on attempt {attempt + 1}: {e}. Screenshot saved to {screenshot_path}")
                 if not self.persist_session:
                     self.rotate_context()
                 self.retry_break(attempt)
@@ -267,7 +278,12 @@ class PlaywrightManager:
                     self.retry_break(attempt)
                 
 
-        self.logger.error(f"All {retries} attempts failed for URL / Selector: {locator}")
+        if e:
+            screenshot_path = self.screenshot_on_error(e)
+            self.logger.error(f"All {retries} attempts failed for URL / Selector: {locator}. Screenshot saved to {screenshot_path}")
+        else:
+            self.logger.error(f"All {retries} attempts failed for URL / Selector: {locator}")
+
         return self.page, []
     
 
@@ -352,7 +368,8 @@ class PlaywrightManager:
                 else:
                     self.page.locator(test).first.wait_for(timeout=timeout * 1000)
             except Exception as e:
-                self.logger.warning(f"Page load test failed: {test} - {e}")
+                screenshot_path = self.screenshot_on_error(e)
+                self.logger.error(f"Page load test failed: {test} - {e}. Screenshot saved to {screenshot_path}")
                 return False
         
         return True
@@ -409,7 +426,8 @@ class PlaywrightManager:
             self.logger.info("Returned to master tab.")
 
         except Exception as e:
-            self.logger.error(f"Failed to return to main tab: {e}")
+            screenshot_path = self.screenshot_on_error(e)
+            self.logger.error(f"Failed to return to main tab: {e}. Screenshot saved to {screenshot_path}")
 
     
     # Function to click open a new tab in a with block
@@ -444,8 +462,11 @@ class PlaywrightManager:
                 
             time.sleep(poll_interval)
 
-        self.logger.error(f"HTML did not change enough after {timeout} seconds. Last diff: {diff_pct}% against threshold: {threshold}%")
-        return diff_pct
+        error = RuntimeError(f"HTML did not change enough after {timeout} seconds (diff={diff_pct:.2f}%, threshold={threshold}%)")
+        screenshot_path = self.screenshot_on_error(error)
+        self.logger.error(f"HTML did not change enough after {timeout} seconds. Last diff: {diff_pct}%. Screenshot saved to {screenshot_path}")
+
+        raise error
 
 
     # Function to wait for the HTML to settle
@@ -471,8 +492,12 @@ class PlaywrightManager:
                 
             time.sleep(poll_interval)
 
-        self.logger.error(f"HTML continued to change after {timeout} seconds. Last diff: {diff_pct}% against threshold: {threshold}%")
-        return diff_pct
+
+        error = RuntimeError(f"HTML continued to change after {timeout} seconds (diff={diff_pct:.2f}%, threshold={threshold}%)")
+        screenshot_path = self.screenshot_on_error(error)
+        self.logger.error(f"HTML continued to change after {timeout} seconds. Last diff: {diff_pct}%. Screenshot saved to {screenshot_path}")
+
+        raise error
     
     # ─────────────────────────────────────────────
     # API Interception Helpers
@@ -524,12 +549,14 @@ class PlaywrightManager:
                     responses[endpoint] = json_match if json_match else html
                 else:
                     responses[endpoint] = response.text()
-            except PlaywrightTimeoutError:
-                self.logger.error(f"Timeout waiting for {endpoint}")
+            except PlaywrightTimeoutError as e:
+                screenshot_path = self.screenshot_on_error(e)
+                self.logger.error(f"Timeout waiting for {endpoint}. Screenshot saved to {screenshot_path}")
                 responses[endpoint] = None
                 missing_responses.append(endpoint)
             except Exception as e:
-                self.logger.error(f"Failed to collect response for {endpoint}: {e}")
+                screenshot_path = self.screenshot_on_error(e)
+                self.logger.error(f"Failed to collect response for {endpoint}: {e}. Screenshot saved to {screenshot_path}")
                 responses[endpoint] = None
                 missing_responses.append(endpoint)
 
@@ -623,12 +650,15 @@ class PlaywrightManager:
                 self.page.mouse.wheel(0, speed)
                 self.micro_delay()
 
-        self.logger.error(f"Failed to scroll to {locator} after {max_scrolls} attempts")
+        error = RuntimeError(f"Failed to scroll to {locator} after {max_scrolls} attempts")
+        screenshot_path = self.screenshot_on_error(error)
+        self.logger.error(f"Failed to scroll to {locator} after {max_scrolls} attempts. Screenshot saved to {screenshot_path}")
 
         try:
             locator.scroll_into_view_if_needed()
         except Exception as e:
-            self.logger.error(f"Scroll into view also failed: {e}")
+            screenshot_path = self.screenshot_on_error(e)
+            self.logger.error(f"Scroll into view also failed: {e}. Screenshot saved to {screenshot_path}")
 
 
     # Function to randomly choose an action to mimic behavior
@@ -690,7 +720,7 @@ class PlaywrightManager:
         time.sleep(delay)
 
     # ─────────────────────────────────────────────
-    # Image Download
+    # Image Helpers
     # ─────────────────────────────────────────────
 
     # Function to download an image from a selector
@@ -713,19 +743,109 @@ class PlaywrightManager:
             else:
                 self.logger.warning(f"Image request failed: {r.status_code}")
         except Exception as e:
-            self.logger.error(f"Image download error: {e}")
+            screenshot_path = self.screenshot_on_error(e)
+            self.logger.error(f"Image download error: {e}. Screenshot saved to {screenshot_path}")
 
 
     # Function to take a screenshot of webpage
-    def take_screenshot(self, filename: str = "screenshot.png", full_page: bool = True):
+    def take_screenshot(self, filename_prefix: str = None, method: str = None, identifier: str | dict | Locator = None, quality: int = 100, timeout: float = 10.0, save: bool = True, path: str = None):
         try:
-            self.page.screenshot(path=filename, full_page=full_page)
-            self.logger.info(f"Screenshot saved: {filename}")
+            if method is None:
+                screenshot_bytes = self.page.screenshot(full_page=False, quality=quality, timeout=timeout)
+            elif method == "full_page":
+                screenshot_bytes = self.page.screenshot(full_page=True, quality=quality, timeout=timeout)
+            elif method == "locator":
+                if not isinstance(identifier, Locator):
+                    raise ValueError("Locator is required when method is 'locator'")
+                screenshot_bytes = identifier.screenshot(quality=quality, timeout=timeout)
+            elif method == "selector":
+                if not isinstance(identifier, str):
+                    raise ValueError("Selector is required when method is 'selector'")
+                screenshot_bytes = self.page.locator(identifier).screenshot(quality=quality, timeout=timeout)
+            elif method == "clip":
+                if not isinstance(identifier, dict):
+                    raise ValueError("Bounding box is required when method is 'clip'")
+                screenshot_bytes = self.page.screenshot(quality=quality, timeout=timeout, clip=identifier)
+            else:
+                raise ValueError(f"Invalid method: {method}")
+        
         except Exception as e:
             self.logger.error(f"Screenshot failed: {e}")
+            return None
+
+        if save:
+            return self.save_screenshot(filename_prefix, screenshot_bytes, path)
+        else:
+            return screenshot_bytes
+
+
+    # Function to save a screenshot
+    def save_screenshot(self, filename_prefix: str = None, image_bytes: bytes = None, gcs: bool = False, path: str = None) -> str:
+        if not filename_prefix:
+            raw_url = self.page.url
+            parsed = urlparse(raw_url)
+            filename_prefix = f"{parsed.netloc}_{parsed.path}"
+
+        filename_prefix = re.sub(r'[^\w\-_.]', '_', filename_prefix)
+        
+        unique_id = str(uuid.uuid4())
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{filename_prefix}_{timestamp}_{unique_id}.png"
+
+        if not image_bytes:
+            image_bytes = self.page.screenshot(full_page=True)
+
+        try:
+            if not path:
+                path = "screenshots"
+            elif path.startswith("GCS:"):
+                gcs_bucket, gcs_prefix = path.split("GCS:")[1].split("/", 1)
+                if not gcs_prefix.endswith("/"):
+                    gcs_prefix += "/"
+                client = storage.Client()
+                bucket = client.bucket(gcs_bucket)
+                blob = bucket.blob(gcs_prefix + filename)
+                blob.upload_from_string(image_bytes, content_type="image/png")
+                return f"https://storage.googleapis.com/{gcs_bucket}/{gcs_prefix}{filename}"
+            else:
+                path = path.rstrip("/")
+                Path(path).mkdir(parents=True, exist_ok=True)
+                local_path = os.path.join(path, filename)
+
+                with open(local_path, "wb") as f:
+                    f.write(image_bytes)
+                return local_path
+        except Exception as e:
+            self.logger.error(f"Failed to save screenshot: {e}")
+            return None
+            
+    
+    # Function to call for screenshot on error
+    def screenshot_on_error(self, error: Exception):
+        if not self.should_screenshot_errors:
+            return None
+
+        try:
+            error_name = error.__class__.__name__
+
+            msg = str(error) or "error"
+            msg_slug = re.sub(r"[^\w\-_.]", "_", msg)[:50]
+
+            page_url = getattr(self.page, "url", "unknown_url")
+            url_slug = re.sub(r"[^\w\-_.]", "_", page_url)[:80]
+
+            filename_prefix = f"{error_name}_{msg_slug}_{url_slug}"
+
+            path = self.take_screenshot(full_page = True, filename_prefix = filename_prefix, path = self.error_screenshot_path)
+
+            return path
+
+        except Exception as e:
+            self.logger.warning(f"Failed to capture screenshot on error: {e}")
+            return None
 
     # ─────────────────────────────────────────────
-    # JSON Extraction Helpers
+    # Data Extraction Helpers
     # ─────────────────────────────────────────────
 
     # Function to extract JSON data from a response
@@ -763,4 +883,70 @@ class PlaywrightManager:
         return results
     
 
+    # Function to extract text from html
+    def extract_visible_text(self, html: str | list[str], max_length: int = None) -> str:
+        if isinstance(html, str):
+            html = [html]
+
+        all_text = []
+
+        for item in html:
+            try:
+                soup = BeautifulSoup(item, "lxml")
+            except Exception:
+                soup = BeautifulSoup(item, "html.parser")
+
+            for tag in soup(["script", "style", "meta", "noscript"]):
+                tag.decompose()
+
+            text = soup.get_text(separator=' ', strip=True)
+            all_text.append(text)
+
+        full_text = "\n\n".join(all_text)
+
+        if max_length:
+            full_text = full_text[:max_length]
+        
+        return full_text
+    
+
+    # Function to extract links from html
+    def extract_links(self, page: Page = None, base_url: str = None, visible: bool = True):
+        if not page:
+            page = self.page
+
+        anchors = page.locator("a[href]").all()
+
+        all_links = []
+
+        for anchor in anchors:
+            try:
+                href = anchor.get_attribute("href")
+                text = anchor.inner_text().strip()
+                
+                if not href:
+                    continue
+
+                if base_url and href.startswith("/"):
+                    href = urljoin(base_url, href)
+
+                is_visible = anchor.is_visible()
+
+                if visible and not is_visible:
+                    continue
+
+                if base_url:
+                    parsed_base = urlparse(base_url).netloc
+                    parsed_href = urlparse(href).netloc
+                    if parsed_base and parsed_href and parsed_base not in parsed_href:
+                        continue
+
+                all_links.append({
+                    "href": href,
+                    "text": text
+                })
+            except Exception:
+                continue
+
+        return all_links
 
