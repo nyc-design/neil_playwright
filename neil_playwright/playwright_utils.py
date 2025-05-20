@@ -33,6 +33,7 @@ class PlaywrightManager:
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
         self.extension_path = self.configuration.get("EXTENSION_PATH", None)
+        self.is_captcha_extension = self.configuration.get("CAPTCHA_EXTENSION", False)
         self.should_screenshot_errors = self.configuration.get("ERROR_SCREENSHOTS", False)
         self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOT_PATH", "screenshots/errors")
         
@@ -203,7 +204,7 @@ class PlaywrightManager:
         elif system == "Linux":
             return "/usr/bin/google-chrome"
         else:
-            raise RuntimeError(f"Unsupported platform: {system}")
+            raise ValueError(f"Unsupported platform: {system}")
         
 
     # ─────────────────────────────────────────────
@@ -249,11 +250,17 @@ class PlaywrightManager:
                         self.test_captcha()
                         self.retry_break(attempt)
                         if not self.test_page_load(tests, before_html, timeout=timeout):
-                            raise RuntimeError(f"Failed to load page after retry: {self.page.url}")
+                            error = RuntimeError(f"Failed to load page after retry: {self.page.url}")
+                            screenshot_path = self.screenshot_on_error(error)
+                            self.logger.error(f"Failed to load page after retry: {self.page.url}. Screenshot saved to {screenshot_path}")
+                            raise error
 
                     responses, missing_responses = self.collect_responses(listeners)
                     if missing_responses:
-                        raise RuntimeError(f"Failed to collect responses: {missing_responses}")
+                        error = RuntimeError(f"Failed to collect responses: {missing_responses}")
+                        screenshot_path = self.screenshot_on_error(error)
+                        self.logger.error(f"Failed to collect responses: {missing_responses}. Screenshot saved to {screenshot_path}")
+                        raise error
                     
                     self.responses = responses
                         
@@ -302,7 +309,10 @@ class PlaywrightManager:
                 self.scroll_and_hover(locator, human_cursor)
             new_page = self.click_new_tab(locator, human_cursor)
             if not new_page:
-                raise RuntimeError(f"Failed to open new tab for {locator}")
+                error = RuntimeError(f"Failed to open new tab for {locator}")
+                screenshot_path = self.screenshot_on_error(error)
+                self.logger.error(f"Failed to open new tab for {locator}. Screenshot saved to {screenshot_path}")
+                raise error
             self.page.wait_for_load_state("load")
             self.page.wait_for_url(lambda url: url != current_url)
         elif method == "enter_button":
@@ -319,18 +329,26 @@ class PlaywrightManager:
         
     
     # Function to poll for Captcha completion
-    def test_captcha(self):
+    def test_captcha(self, timeout: float = 200.0):
         if self.abm.is_captcha_present(self.page):
-            self.precaptcha_url = self.page.url
-            timeout = 200
-            start_time = time.time()
-            while timeout > (time.time() - start_time):
-                if not self.abm.is_captcha_present(self.page):
-                    break
-                time.sleep(1)
+            if self.is_captcha_extension:
+                self.precaptcha_url = self.page.url
+                start_time = time.time()
+                while timeout > (time.time() - start_time):
+                    if not self.abm.is_captcha_present(self.page):
+                        break
+                    time.sleep(1)
+                else:
+                    if self.precaptcha_url == self.page.url:
+                        error = RuntimeError(f"Captcha not solved after {timeout} seconds")
+                        screenshot_path = self.screenshot_on_error(error)
+                        self.logger.error(f"Captcha not solved after {timeout} seconds. Screenshot saved to {screenshot_path}")
+                        raise error
             else:
-                if self.precaptcha_url == self.page.url:
-                    raise RuntimeError("Captcha not solved after 200 seconds")
+                error = RuntimeError("Captcha extension is not enabled, but a captcha was detected.")
+                screenshot_path = self.screenshot_on_error(error)
+                self.logger.error(f"Captcha extension is not enabled, but a captcha was detected. Screenshot saved to {screenshot_path}")
+                raise error
 
 
     # Function to test the page load
@@ -577,7 +595,11 @@ class PlaywrightManager:
                 return
             self.page.wait_for_timeout(poll_interval * 1000)
 
-        raise RuntimeError(error_message.format(timeout=timeout))
+        error = RuntimeError("Timeout waiting for a predicate")
+        screenshot_path = self.screenshot_on_error(error)
+        self.logger.error(f"Timeout waiting for a predicate. Screenshot saved to {screenshot_path}")
+
+        raise error
     
 
     # Function to mimic a micro delay
