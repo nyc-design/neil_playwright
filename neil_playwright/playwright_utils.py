@@ -772,7 +772,7 @@ class PlaywrightManager:
     # Function to take a screenshot of webpage
     def take_screenshot(self, filename_prefix: str = None, method: str = None, identifier: str | dict | Locator = None, quality: int = 100, timeout: float = 10.0, save: bool = True, path: str = None):
         try:
-            if method is None:
+            if not method:
                 screenshot_bytes = self.page.screenshot(full_page=False, quality=quality, timeout=timeout)
             elif method == "full_page":
                 screenshot_bytes = self.page.screenshot(full_page=True, quality=quality, timeout=timeout)
