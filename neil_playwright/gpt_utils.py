@@ -60,6 +60,10 @@ class GPTHandler:
             
             return json.loads(content)
                 
+        except json.JSONDecodeError:
+            self.logger.warning("Malformed GPT JSON. Attempting to repair or return fallback.")
+            return {"raw_response": content}
+        
         except Exception as e:
             self.logger.error(f"GPT call failed: {e}")
             return {}
@@ -171,7 +175,11 @@ class GPTHandler:
             self.logger.info(f"GPT Response: {content}")
             
             return json.loads(content)
-                
+
+        except json.JSONDecodeError:
+            self.logger.warning("Malformed GPT JSON. Attempting to repair or return fallback.")
+            return {"raw_response": content}
+        
         except Exception as e:
             self.logger.error(f"GPT call failed: {e}")
             return {}
