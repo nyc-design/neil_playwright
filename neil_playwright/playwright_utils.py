@@ -796,13 +796,13 @@ class PlaywrightManager:
             return None
 
         if save:
-            return self.save_screenshot(filename_prefix, screenshot_bytes, path)
+            return self.save_screenshot(filename_prefix = filename_prefix, image_bytes = screenshot_bytes, path = path)
         else:
             return screenshot_bytes
 
 
     # Function to save a screenshot
-    def save_screenshot(self, filename_prefix: str = None, image_bytes: bytes = None, gcs: bool = False, path: str = None) -> str:
+    def save_screenshot(self, filename_prefix: str = None, image_bytes: bytes = None, path: str = None) -> str:
         if not filename_prefix:
             raw_url = self.page.url
             parsed = urlparse(raw_url)
@@ -820,9 +820,18 @@ class PlaywrightManager:
         try:
             if not path:
                 path = "screenshots"
+                Path(path).mkdir(parents=True, exist_ok=True)
+                local_path = os.path.join(path, filename)
+
+                with open(local_path, "wb") as f:
+                    f.write(image_bytes)
+                return local_path
             elif path.startswith("GCS:"):
-                gcs_bucket, gcs_prefix = path.split("GCS:")[1].split("/", 1)
-                if not gcs_prefix.endswith("/"):
+                gcs_path = path.split("GCS:")[1]
+                gcs_parts = gcs_path.split("/", 1)
+                gcs_bucket = gcs_parts[0]
+                gcs_prefix = gcs_parts[1] if len(gcs_parts) > 1 else ""
+                if not gcs_prefix.endswith("/") and gcs_prefix != "":
                     gcs_prefix += "/"
                 client = storage.Client.from_service_account_json(self.configuration.get("GCS_CREDENTIALS", "service_account.json"))
                 bucket = client.bucket(gcs_bucket)
@@ -858,7 +867,7 @@ class PlaywrightManager:
 
             filename_prefix = f"{error_name}_{msg_slug}_{url_slug}"
 
-            path = self.take_screenshot(full_page = True, filename_prefix = filename_prefix, path = self.error_screenshot_path)
+            path = self.take_screenshot(method = "full_page", filename_prefix = filename_prefix, path = self.error_screenshot_path)
 
             return path
 
