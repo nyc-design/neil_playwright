@@ -773,21 +773,21 @@ class PlaywrightManager:
     def take_screenshot(self, filename_prefix: str = None, method: str = None, identifier: str | dict | Locator = None, timeout: float = 10.0, save: bool = True, path: str = None):
         try:
             if not method:
-                screenshot_bytes = self.page.screenshot(full_page=False, timeout=timeout)
+                screenshot_bytes = self.page.screenshot(full_page=False, timeout=timeout*1000)
             elif method == "full_page":
-                screenshot_bytes = self.page.screenshot(full_page=True, timeout=timeout)
+                screenshot_bytes = self.page.screenshot(full_page=True, timeout=timeout*1000)
             elif method == "locator":
                 if not isinstance(identifier, Locator):
                     raise ValueError("Locator is required when method is 'locator'")
-                screenshot_bytes = identifier.screenshot(timeout=timeout)
+                screenshot_bytes = identifier.screenshot(timeout=timeout*1000)
             elif method == "selector":
                 if not isinstance(identifier, str):
                     raise ValueError("Selector is required when method is 'selector'")
-                screenshot_bytes = self.page.locator(identifier).screenshot(timeout=timeout)
+                screenshot_bytes = self.page.locator(identifier).screenshot(timeout=timeout*1000)
             elif method == "clip":
                 if not isinstance(identifier, dict):
                     raise ValueError("Bounding box is required when method is 'clip'")
-                screenshot_bytes = self.page.screenshot(timeout=timeout, clip=identifier)
+                screenshot_bytes = self.page.screenshot(timeout=timeout*1000, clip=identifier)
             else:
                 raise ValueError(f"Invalid method: {method}")
         
