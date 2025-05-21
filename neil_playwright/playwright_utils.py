@@ -824,7 +824,7 @@ class PlaywrightManager:
                 gcs_bucket, gcs_prefix = path.split("GCS:")[1].split("/", 1)
                 if not gcs_prefix.endswith("/"):
                     gcs_prefix += "/"
-                client = storage.Client()
+                client = storage.Client.from_service_account_json(self.configuration.get("GCS_CREDENTIALS", "service_account.json"))
                 bucket = client.bucket(gcs_bucket)
                 blob = bucket.blob(gcs_prefix + filename)
                 blob.upload_from_string(image_bytes, content_type="image/png")
