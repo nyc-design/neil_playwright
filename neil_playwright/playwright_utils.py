@@ -297,6 +297,8 @@ class PlaywrightManager:
     # Function to figure out how to navigate
     def navigate(self, current_url: str, method: str, locator: str | Locator, *, hover_and_click: bool = True, human_cursor: bool = True):
         if method == "load_url":
+            if isinstance(locator, str) and not locator.startswith(("http://", "https://")):
+                locator = "https://" + locator
             self.page.goto(locator)
         elif method == "click":
             if hover_and_click:
