@@ -35,7 +35,7 @@ class PlaywrightManager:
         self.extension_path = self.configuration.get("EXTENSION_PATH", None)
         self.is_captcha_extension = self.configuration.get("CAPTCHA_EXTENSION", False)
         self.should_screenshot_errors = self.configuration.get("ERROR_SCREENSHOTS", False)
-        self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOT_PATH", "screenshots/errors")
+        self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOTS_PATH", "screenshots/errors")
         
         self.data_utils = DataUtils(logger=self.logger)
 
