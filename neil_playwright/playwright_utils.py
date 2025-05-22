@@ -952,42 +952,49 @@ class PlaywrightManager:
     
 
     # Function to extract links from html
-    def extract_links(self, page: Page = None, base_url: str = None, visible: bool = True):
+    def extract_links(self, page: Page = None, base_url: str = None, visible: bool = False):
         if not page:
             page = self.page
 
-        anchors = page.locator("a[href]").all()
+        raw_links = page.eval_on_selector_all(
+            "a[href]",
+            """elements => elements.map(el => {
+                const href = el.href || "";
+                const text = el.textContent.trim() || "";
+                // visible if not display:none and in the layout
+                const style = window.getComputedStyle(el);
+                const isVisible = style.display !== "none" && el.offsetParent !== null;
+                return { href, text, isVisible };
+            })"""
+        )
 
-        all_links = []
+        parsed_base = urlparse(base_url).netloc if base_url else None
+        filtered = []
 
-        for anchor in anchors:
+        for link in raw_links:
             try:
-                href = anchor.get_attribute("href")
-                text = anchor.inner_text().strip()
+                href = link["href"]
+                text = link["text"]
+                is_visible = link["isVisible"]
                 
                 if not href:
+                    continue
+
+                if visible and not is_visible:
                     continue
 
                 if base_url and href.startswith("/"):
                     href = urljoin(base_url, href)
 
-                is_visible = anchor.is_visible()
-
-                if visible and not is_visible:
-                    continue
-
-                if base_url:
-                    parsed_base = urlparse(base_url).netloc
-                    parsed_href = urlparse(href).netloc
-                    if parsed_base and parsed_href and parsed_base not in parsed_href:
+                if parsed_base:
+                    netloc = urlparse(href).netloc
+                    if netloc and parsed_base not in netloc:
                         continue
 
-                all_links.append({
-                    "href": href,
-                    "text": text
-                })
+                filtered.append({"href": href, "text": text})
+
             except Exception:
                 continue
 
-        return all_links
+        return filtered
 
