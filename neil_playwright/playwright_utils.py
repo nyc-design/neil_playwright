@@ -300,7 +300,14 @@ class PlaywrightManager:
         if method == "load_url":
             if isinstance(locator, str) and not locator.startswith(("http://", "https://")):
                 locator = url_normalize(locator, default_scheme="https")
-            self.page.goto(locator)
+            try:
+                self.page.goto(locator)
+            except Exception as e:
+                if isinstance(e, PlaywrightTimeoutError) or "ERR_SSL" in str(e):
+                    fallback = url_normalize(locator, default_scheme="http")
+                    self.page.goto(fallback)
+                else:
+                    raise e
         elif method == "click":
             if hover_and_click:
                 self.scroll_and_hover(locator, human_cursor)
