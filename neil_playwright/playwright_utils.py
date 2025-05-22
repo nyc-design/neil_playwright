@@ -22,6 +22,7 @@ from bs4 import BeautifulSoup
 from google.cloud import storage
 from pathlib import Path
 import uuid
+from url_normalize import url_normalize
 
 
 
@@ -298,7 +299,7 @@ class PlaywrightManager:
     def navigate(self, current_url: str, method: str, locator: str | Locator, *, hover_and_click: bool = True, human_cursor: bool = True):
         if method == "load_url":
             if isinstance(locator, str) and not locator.startswith(("http://", "https://")):
-                locator = "https://" + locator
+                locator = url_normalize(locator)
             self.page.goto(locator)
         elif method == "click":
             if hover_and_click:
