@@ -299,7 +299,7 @@ class PlaywrightManager:
     def navigate(self, current_url: str, method: str, locator: str | Locator, *, hover_and_click: bool = True, human_cursor: bool = True):
         if method == "load_url":
             if isinstance(locator, str) and not locator.startswith(("http://", "https://")):
-                locator = url_normalize(locator)
+                locator = url_normalize(locator, default_scheme="https")
             self.page.goto(locator)
         elif method == "click":
             if hover_and_click:
