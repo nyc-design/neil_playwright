@@ -35,6 +35,7 @@ class PlaywrightManager:
         self.configuration = self._load_config(config)
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
+        self.extension_path = self.configuration.get("EXTENSIONS_PATH", None)
         self.is_captcha_extension = self.configuration.get("CAPTCHA_EXTENSION", False)
         self.should_screenshot_errors = self.configuration.get("ERROR_SCREENSHOTS", False)
         self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOTS_PATH", "screenshots/errors")
@@ -49,7 +50,7 @@ class PlaywrightManager:
             self.profile_path = self.download_gcs_profile(self.profile_path, self.profile_name)
         else:
             self.gcs_profile = False
-        self.extension_path = self.configuration.get("EXTENSION_PATH", None)
+
         if self.extension_path.startswith("GCS:"):
             self.extension_path = self.download_extensions(self.extension_path)
         
