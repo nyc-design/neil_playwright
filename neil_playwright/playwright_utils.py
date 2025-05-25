@@ -12,7 +12,7 @@ from python_ghost_cursor.playwright_sync import create_cursor
 from .antibot_utils import AntiBotManager
 import requests
 from contextlib import contextmanager, ExitStack
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 import ast
 from html_similarity import style_similarity
@@ -500,10 +500,10 @@ class PlaywrightManager:
 
     # Function to test how much the HMTL has changed
     def wait_for_html_change(self, before_html: str, threshold: float = 10.0, timeout: float = 10.0, poll_interval: float = 0.5):
-        end_time = datetime.now(datetime.UTC) + timedelta(seconds=timeout)
+        end_time = datetime.now(timezone.utc) + timedelta(seconds=timeout)
         diff_pct = 0
 
-        while datetime.now(datetime.UTC) < end_time:
+        while datetime.now(timezone.utc) < end_time:
             try:
                 current_html = self.page.inner_html("body")
             except Exception as e:
@@ -527,10 +527,10 @@ class PlaywrightManager:
 
     # Function to wait for the HTML to settle
     def wait_for_html_settle(self, page: Page, timeout: float = 30.0, threshold: float = 2.0, poll_interval: float = 1.0):
-        end_time = datetime.now(datetime.UTC) + timedelta(seconds=timeout)
+        end_time = datetime.now(timezone.utc) + timedelta(seconds=timeout)
         diff_pct = 100
 
-        while datetime.now(datetime.UTC) < end_time:
+        while datetime.now(timezone.utc) < end_time:
             try:
                 first_html = self.page.inner_html("body")
                 time.sleep(poll_interval)
@@ -627,8 +627,8 @@ class PlaywrightManager:
 
     # Function to wait for a predicate to be true
     def wait_for(self, predicate: Callable, timeout: float = 10.0, poll_interval: float = 0.5, error_message: str = "Predicate not met after {timeout} seconds"):
-        end_time = datetime.now(datetime.UTC) + timedelta(seconds=timeout)
-        while datetime.now(datetime.UTC) < end_time:
+        end_time = datetime.now(timezone.utc) + timedelta(seconds=timeout)
+        while datetime.now(timezone.utc) < end_time:
             if predicate():
                 return
             self.page.wait_for_timeout(poll_interval * 1000)
@@ -849,7 +849,7 @@ class PlaywrightManager:
         filename_prefix = re.sub(r'[^\w\-_.]', '_', filename_prefix)
         
         unique_id = str(uuid.uuid4())
-        timestamp = datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         filename = f"{filename_prefix}_{timestamp}_{unique_id}.png"
 
         if not image_bytes:
