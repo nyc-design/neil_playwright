@@ -313,7 +313,6 @@ class PlaywrightManager:
                     self.page.goto(current_url)
                     self.retry_break(attempt)
                 
-
         if e:
             screenshot_path = self.screenshot_on_error(e)
             self.logger.error(f"All {retries} attempts failed for URL / Selector: {locator}. Screenshot saved to {screenshot_path}")
