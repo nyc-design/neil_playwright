@@ -453,6 +453,7 @@ class PlaywrightManager:
 
         return new_tab
     
+
     # Function to set a tab to the front
     def reset_page(self, page: Page):
         page.bring_to_front()
@@ -460,9 +461,7 @@ class PlaywrightManager:
         page.evaluate("window.focus()")
         self.page = page
         self.cursor = create_cursor(self.page)
-        vp = page.viewport_size or page.evaluate("({ width: window.innerWidth, height: window.innerHeight })")
-        self.page.mouse.move(vp["width"] / 2, vp["height"] / 2)
-
+        self.center_cursor()
 
 
     # Function to return to the main tab
@@ -647,7 +646,7 @@ class PlaywrightManager:
 
 
     # Function to mimic random human delay
-    def human_delay(self, min_delay = 0.5, max_delay = 2.5):
+    def human_delay(self, min_delay = 0.5, max_delay = 1.5):
         delay = round(random.uniform(min_delay, max_delay), 2)
         time.sleep(delay)
 
@@ -688,7 +687,13 @@ class PlaywrightManager:
         if modifier:
             self.page.keyboard.up(modifier)
 
-    
+
+    # Function to center the cursor on the page
+    def center_cursor(self):
+        vp = self.page.viewport_size or self.page.evaluate("({ width: window.innerWidth, height: window.innerHeight })")
+        self.page.mouse.move(vp["width"] / 2, vp["height"] / 2)
+
+
     #Function to mimic page scrolling to element
     def scroll_to(self, locator: Locator, max_scrolls: int = 100, min_scroll: int = 100, max_scroll: int = 500):
         for attempt in range(max_scrolls):
