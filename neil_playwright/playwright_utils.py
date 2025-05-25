@@ -38,6 +38,10 @@ class PlaywrightManager:
         self.is_captcha_extension = self.configuration.get("CAPTCHA_EXTENSION", False)
         self.should_screenshot_errors = self.configuration.get("ERROR_SCREENSHOTS", False)
         self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOTS_PATH", "screenshots/errors")
+        self.video_debug = self.configuration.get("VIDEO_DEBUG", False)
+        self.trace_debug = self.configuration.get("TRACE_DEBUG", False)
+        self.video_debug_dir = self.configuration.get("VIDEO_DEBUG_DIR", None)
+        self.trace_debug_dir = self.configuration.get("TRACE_DEBUG_DIR", None)
 
         self.temp_dirs = []
         if self.profile_path.startswith("GCS:"):
@@ -89,6 +93,8 @@ class PlaywrightManager:
         finally:
             if self.gcs_profile:
                 self.upload_gcs_profile(self.profile_path, self.profile_name)
+            if self.video_debug or self.trace_debug:
+                self.save_debug_files(self.video_debug_dir, self.trace_debug_dir)
             if self.temp_dirs:
                 for temp_dir in self.temp_dirs:
                     shutil.rmtree(temp_dir)
@@ -128,6 +134,11 @@ class PlaywrightManager:
         if self.extension_path:
             args.append(f"--load-extension={self.get_extension_paths()}")
 
+        if self.video_debug:
+            additional_args, self.video_temp_path = self.get_video_debug_args()
+            context_args.update(additional_args)
+
+
         args.append("--no-first-run")
         args.append("--no-default-browser-check")
         args.append("--disable-dev-shm-usage")
@@ -141,6 +152,9 @@ class PlaywrightManager:
             **context_args  # <- apply proxy, user-agent, locale, geo, etc.
         )
 
+        if self.trace_debug:
+            context.tracing.start(screenshots=True, snapshots=True, sources=True)
+            
         return context
     
 
@@ -155,6 +169,10 @@ class PlaywrightManager:
         if incognito:
             args.append("--incognito")
 
+        if self.video_debug:
+            additional_args, self.video_temp_path = self.get_video_debug_args()
+            context_args.update(additional_args)
+
         args.append("--no-first-run")
         args.append("--no-default-browser-check")
         args.append("--disable-dev-shm-usage")
@@ -166,6 +184,9 @@ class PlaywrightManager:
             args=args,
             **context_args
         )
+
+        if self.trace_debug:
+            context.tracing.start(screenshots=True, snapshots=True, sources=True)
 
         return context
 
@@ -187,6 +208,8 @@ class PlaywrightManager:
     def rotate_context(self):
         self.abm.rotate_identity()
         self.context.close()
+        if self.video_debug or self.trace_debug:
+            self.save_debug_files(self.video_debug_dir, self.trace_debug_dir)
 
         self.context = self._init_context(headless=False)
         self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
@@ -1104,3 +1127,77 @@ class PlaywrightManager:
                     zipf.write(full_path, arcname)
 
         return zip_path
+
+
+    # ─────────────────────────────────────────────
+    # Debug Helpers
+    # ─────────────────────────────────────────────
+
+    # Function to get debug args
+    def get_video_debug_args(self, temp_base: str = "/tmp"):
+        if not self.video_debug:
+            return {}
+        
+        if self.video_debug_dir.startswith("GCS:"):
+            temp_dir = tempfile.mkdtemp(dir=temp_base)
+            self.temp_dirs.append(temp_dir)
+            path = os.path.join(temp_dir, "playwright_videos")
+            Path(path).mkdir(parents=True, exist_ok=True)
+            
+        else:
+            path = self.video_debug_dir
+
+        additional_args = {}
+        additional_args["record_video_dir"] = path
+        additional_args["record_video_size"] = {"width": 1920, "height": 1080}
+
+        return additional_args, path
+
+
+    # Function to save a trace
+    def save_debug_files(self, video_dir: str = None, trace_dir: str = None, temp_base: str = "/tmp"):
+        if not (self.trace_debug or self.video_debug):
+            return
+        
+        if self.trace_debug:
+            if trace_dir.startswith("GCS:"):
+                temp_dir = tempfile.mkdtemp(dir=temp_base)
+                self.temp_dirs.append(temp_dir)
+            else:
+                temp_dir = trace_dir
+
+            trace_filename = f"playwright_trace_{int(time.time())}.zip"
+            trace_temp_path = os.path.join(temp_dir, trace_filename)
+
+            try:
+                self.context.tracing.stop(path=trace_temp_path)
+
+                if trace_dir.startswith("GCS:"):
+                    if trace_dir.endswith("/"):
+                        trace_dir = trace_dir.rstrip("/")
+                    trace_gcs_path = f"{trace_dir}/{trace_filename}"
+                    self.get_blob(trace_gcs_path).upload_from_filename(trace_temp_path)
+                    self.logger.info(f"Trace saved to {trace_gcs_path}")
+                else:
+                    self.logger.info(f"Trace saved to {trace_temp_path}")
+
+            except Exception as e:
+                self.logger.error(f"Failed to save trace: {e}")
+                return
+
+        if self.video_debug:
+            if video_dir.startswith("GCS:"):
+                if video_dir.endswith("/"):
+                    video_dir = video_dir.rstrip("/")
+                for filename in os.listdir(self.video_temp_path):
+                    local_path = os.path.join(self.video_temp_path, filename)
+                    if os.path.isdir(local_path):
+                        continue
+                    try:
+                        video_gcs_path = f"{video_dir}/{filename}"
+                        self.get_blob(video_gcs_path).upload_from_filename(local_path)
+                        self.logger.info(f"Video saved to {video_gcs_path}")
+                    except Exception as e:
+                        self.logger.error(f"Failed to save video: {e}")
+            else:
+                self.logger.info(f"Video saved to {self.video_temp_path}")
