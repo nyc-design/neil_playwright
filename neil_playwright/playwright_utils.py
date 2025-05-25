@@ -119,7 +119,7 @@ class PlaywrightManager:
 
     # Helper function to launch context for desktop mode
     def _launch_desktop_context(self, headless: bool, incognito: bool):
-        profile_dir = self.profile_path if self.persist_session and self.profile_path else "/tmp/default-chrome-profile"
+        profile_dir = self.profile_path if self.persist_session and self.profile_path else os.path.join(tempfile.gettempdir(), "default-chrome-profile")
 
         self.logger.info(f"[DESKTOP MODE] Launching Chrome with {'persistent session' if self.persist_session else 'ephemeral session'} at: {profile_dir}")
 
@@ -1058,7 +1058,9 @@ class PlaywrightManager:
     
 
     # Function to download extensions from GCS
-    def download_extensions(self, gcs_path: str, temp_base: str = "/tmp"):
+    def download_extensions(self, gcs_path: str, temp_base: str = None):
+        if not temp_base:
+            temp_base = tempfile.gettempdir()
         temp_dir = tempfile.mkdtemp(dir=temp_base)
         self.temp_dirs.append(temp_dir)
         temp_zip_path = os.path.join(temp_dir, "extensions.zip")
@@ -1074,7 +1076,9 @@ class PlaywrightManager:
 
 
     # Function to download a GCS profile
-    def download_gcs_profile(self, gcs_path: str, profile_name: str = "Profile 1", temp_base: str = "/tmp"):
+    def download_gcs_profile(self, gcs_path: str, profile_name: str = "Profile 1", temp_base: str = None):
+        if not temp_base:
+            temp_base = tempfile.gettempdir()
         temp_dir = tempfile.mkdtemp(dir=temp_base)
         self.temp_dirs.append(temp_dir)
         temp_zip_path = os.path.join(temp_dir, "chrome_profile.zip")
@@ -1138,10 +1142,13 @@ class PlaywrightManager:
     # ─────────────────────────────────────────────
 
     # Function to get debug args
-    def get_video_debug_args(self, temp_base: str = "/tmp"):
+    def get_video_debug_args(self, temp_base: str = None):
         if not self.video_debug:
             return {}
         
+        if not temp_base:
+            temp_base = tempfile.gettempdir()
+
         if self.video_debug_dir.startswith("GCS:"):
             temp_dir = tempfile.mkdtemp(dir=temp_base)
             self.temp_dirs.append(temp_dir)
@@ -1159,10 +1166,13 @@ class PlaywrightManager:
 
 
     # Function to save a trace
-    def save_debug_files(self, video_dir: str = None, trace_dir: str = None, temp_base: str = "/tmp"):
+    def save_debug_files(self, video_dir: str = None, trace_dir: str = None, temp_base: str = None):
         if not (self.trace_debug or self.video_debug):
             return
         
+        if not temp_base:
+            temp_base = tempfile.gettempdir()
+
         if self.trace_debug:
             if trace_dir.startswith("GCS:"):
                 temp_dir = tempfile.mkdtemp(dir=temp_base)
