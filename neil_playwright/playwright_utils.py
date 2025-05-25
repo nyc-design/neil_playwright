@@ -22,6 +22,9 @@ from bs4 import BeautifulSoup
 from google.cloud import storage
 from pathlib import Path
 import uuid
+import zipfile
+import shutil
+import tempfile
 from url_normalize import url_normalize
 
 
@@ -30,13 +33,21 @@ class PlaywrightManager:
     def __init__(self, config = None, logger: UniversalLogger = None):
         self.logger = logger or SimpleNamespace(info = print, warning = print, error = print, debug = print)
         self.configuration = self._load_config(config)
-        self.chrome_path = self.configuration.get("CHROME_PATH") or self.get_default_chrome_path()
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
-        self.extension_path = self.configuration.get("EXTENSION_PATH", None)
         self.is_captcha_extension = self.configuration.get("CAPTCHA_EXTENSION", False)
         self.should_screenshot_errors = self.configuration.get("ERROR_SCREENSHOTS", False)
         self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOTS_PATH", "screenshots/errors")
+
+        self.temp_dirs = []
+        if self.profile_path.startswith("GCS:"):
+            self.gcs_profile = True
+            self.profile_path = self.download_gcs_profile(self.profile_path, self.profile_name)
+        else:
+            self.gcs_profile = False
+        self.extension_path = self.configuration.get("EXTENSION_PATH", None)
+        if self.extension_path.startswith("GCS:"):
+            self.extension_path = self.download_extensions(self.extension_path)
         
         self.data_utils = DataUtils(logger=self.logger)
 
@@ -74,6 +85,14 @@ class PlaywrightManager:
         except Exception as final_error:
             screenshot_path = self.screenshot_on_error(final_error)
             self.logger.error(f"Unexpected error during shutdown: {final_error}. Screenshot saved to {screenshot_path}")
+
+        finally:
+            if self.gcs_profile:
+                self.upload_gcs_profile(self.profile_path, self.profile_name)
+            if self.temp_dirs:
+                for temp_dir in self.temp_dirs:
+                    shutil.rmtree(temp_dir)
+                self.temp_dirs.clear()
 
     
     def _load_config(self, config: str):
@@ -117,7 +136,7 @@ class PlaywrightManager:
         context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
             headless=headless,
-            executable_path=self.chrome_path,
+            channel="chrome",
             args=args,
             **context_args  # <- apply proxy, user-agent, locale, geo, etc.
         )
@@ -191,22 +210,7 @@ class PlaywrightManager:
             raise ValueError(f"No valid extensions found in: {base_dir}")
         
         # Chrome expects comma-separated absolute paths
-        return ",".join(ext_dirs)
-
-
-    # Function to get the default chrome path
-    def get_default_chrome_path(self):
-        system = platform.system()
-
-        if system == "Windows":
-            return r"C:\Program Files\Google\Chrome\Application\chrome.exe"
-        elif system == "Darwin":  # macOS
-            return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-        elif system == "Linux":
-            return "/usr/bin/google-chrome"
-        else:
-            raise ValueError(f"Unsupported platform: {system}")
-        
+        return ",".join(ext_dirs)        
 
     # ─────────────────────────────────────────────
     # URL Checkers
@@ -998,3 +1002,105 @@ class PlaywrightManager:
 
         return filtered
 
+
+    # ─────────────────────────────────────────────
+    # Cloud Storage Helpers
+    # ─────────────────────────────────────────────
+
+    # Function to get a blob from GCS
+    def get_blob(self, path: str):
+        if not path.startswith("GCS:"):
+            raise ValueError("Path must start with GCS:")
+
+        gcs_path = path.split("GCS:")[1]
+        gcs_parts = gcs_path.split("/", 1)
+        gcs_bucket = gcs_parts[0]
+        gcs_path = gcs_parts[1] if len(gcs_parts) > 1 else ""
+        
+        gcs_credentials_path = self.configuration.get("GCS_CREDENTIALS", None)
+
+        if gcs_credentials_path:
+            client = storage.Client.from_service_account_json(gcs_credentials_path)
+        else:
+            client = storage.Client()
+
+        bucket = client.bucket(gcs_bucket)
+        blob = bucket.blob(gcs_path)
+
+        return blob
+    
+
+    # Function to download extensions from GCS
+    def download_extensions(self, gcs_path: str, temp_base: str = "/tmp"):
+        temp_dir = tempfile.mkdtemp(dir=temp_base)
+        self.temp_dirs.append(temp_dir)
+        temp_zip_path = os.path.join(temp_dir, "extensions.zip")
+        temp_ext_path = os.path.join(temp_dir, "extensions")
+
+        blob = self.get_blob(gcs_path)
+        blob.download_to_filename(temp_zip_path)
+
+        with zipfile.ZipFile(temp_zip_path, "r") as zip_ref:
+            zip_ref.extractall(temp_ext_path)
+
+        return temp_ext_path
+
+
+    # Function to download a GCS profile
+    def download_gcs_profile(self, gcs_path: str, profile_name: str = "Profile 1", temp_base: str = "/tmp"):
+        temp_dir = tempfile.mkdtemp(dir=temp_base)
+        self.temp_dirs.append(temp_dir)
+        temp_zip_path = os.path.join(temp_dir, "chrome_profile.zip")
+        temp_profile_path = os.path.join(temp_dir, "chrome_profile")
+
+        blob = self.get_blob(gcs_path)
+        blob.download_to_filename(temp_zip_path)
+
+        with zipfile.ZipFile(temp_zip_path, "r") as zip_ref:
+            zip_ref.extractall(temp_profile_path)
+
+        self.original_top_items = set(os.listdir(temp_profile_path))
+
+        self.original_profile_items = set(os.listdir(os.path.join(temp_profile_path, profile_name)))
+
+        return temp_profile_path
+
+
+    # Function to zip and save a profile to GCS
+    def upload_gcs_profile(self, gcs_path: str, profile_name: str = "Profile 1", temp_path: str = None):
+        if not temp_path:
+            temp_path = self.download_gcs_profile(gcs_path, profile_name)
+
+        self.prune_to_original_items(temp_path, self.original_top_items)
+        self.prune_to_original_items(os.path.join(temp_path, profile_name), self.original_profile_items)
+
+        temp_dir = os.path.dirname(temp_path)
+        zip_path = self.zip_folder(temp_path, os.path.join(temp_dir, "chrome_profile.zip"))
+
+        blob = self.get_blob(gcs_path)
+        blob.upload_from_filename(zip_path)
+
+        return zip_path
+        
+
+    # Function to prune to the original items set
+    def prune_to_original_items(self, profile_dir: str, original_items: set):
+        for item in os.listdir(profile_dir):
+            full_path = os.path.join(profile_dir, item)
+            if item not in original_items:
+                if os.path.isdir(full_path):
+                    shutil.rmtree(full_path)
+                else:
+                    os.remove(full_path)
+
+
+    # Function to zip a folder
+    def zip_folder(self, folder_path, zip_path):
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for root, dirs, files in os.walk(folder_path):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    arcname = os.path.relpath(full_path, folder_path)  # relative inside the zip
+                    zipf.write(full_path, arcname)
+
+        return zip_path
