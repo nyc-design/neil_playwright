@@ -41,8 +41,8 @@ class PlaywrightManager:
         self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOTS_PATH", "screenshots/errors")
         self.video_debug = self.configuration.get("VIDEO_DEBUG", False)
         self.trace_debug = self.configuration.get("TRACE_DEBUG", False)
-        self.video_debug_dir = self.configuration.get("VIDEO_DEBUG_DIR", None)
-        self.trace_debug_dir = self.configuration.get("TRACE_DEBUG_DIR", None)
+        self.video_debug_dir = self.configuration.get("VIDEO_DEBUG_PATH", None)
+        self.trace_debug_dir = self.configuration.get("TRACE_DEBUG_PATH", None)
 
         self.temp_dirs = []
         if self.profile_path.startswith("GCS:"):
