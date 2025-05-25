@@ -398,7 +398,6 @@ class PlaywrightManager:
                 if "text=" in test:
                     text = test.split("text=")[1]
                     pattern = re.compile(re.escape(text), re.IGNORECASE)
-                    print(pattern)
                     self.page.get_by_text(pattern).first.wait_for(timeout=timeout * 1000)
                 elif "role=" in test:
                     role = test.split("role=")[1]

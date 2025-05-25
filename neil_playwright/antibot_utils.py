@@ -164,7 +164,13 @@ class AntiBotManager:
             "funcaptcha.com",                   # FunCaptcha domain
             "/sorry/index",                     # Google “sorry” block page
             "unusual traffic",                  # Google block messaging
-            "our systems have detected unusual traffic"
+            "our systems have detected unusual traffic",
+            "verifying you are human",            # Large central text
+            "checking your browser before accessing",  # Subtitle/small print
+            'id="challenge-form"',               # Form element on interstitial
+            'class="challenge-form"',            # Sometimes used instead of id
+            "data-translate=\"checking_browser\"",  # Attribute for translation
+            "cloudflare turnstile",              # In text sometimes
         ]
 
         detected = any(token in lower for token in keywords)
