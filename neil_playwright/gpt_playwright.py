@@ -9,7 +9,6 @@ import math
 from .playwright_utils import PlaywrightManager
 from pymongo.database import Database
 from collections import defaultdict
-from flatten_json import flatten
 import json
 from types import SimpleNamespace
 
@@ -48,7 +47,7 @@ class GPTPlaywright:
             {
                 "$set": {
                     "selectors": new_selectors,
-                    "timestamp": datetime.now(datetime.UTC)
+                    "timestamp": datetime.now(timezone.utc)
                 }
             },
             upsert=True
@@ -77,7 +76,7 @@ class GPTPlaywright:
                 "$set": {
                     "keys": new_keys,
                     "sample_json": sample_json,
-                    "timestamp": datetime.now(datetime.UTC)
+                    "timestamp": datetime.now(timezone.utc)
                 }
             },
             upsert=True
@@ -206,7 +205,7 @@ class GPTPlaywright:
         selector_doc = self.get_selector_doc_from_db(category)
         
         # Check if selectors are out of date (older than a week)
-        if selector_doc and selector_doc.get("selectors") and (datetime.now(datetime.UTC) - selector_doc.get("timestamp", datetime.min.replace(tzinfo=timezone.utc))).days < self.update_interval and not force_update:
+        if selector_doc and selector_doc.get("selectors") and (datetime.now(timezone.utc) - selector_doc.get("timestamp", datetime.min.replace(tzinfo=timezone.utc))).days < self.update_interval and not force_update:
             self.logger.info(f"Using cached selectors for category: {category}")
             return selector_doc.get("selectors", {})
         elif not selector_doc:
@@ -276,7 +275,7 @@ class GPTPlaywright:
     def get_keys(self, endpoint_name: str, json_sample: str = None, force_update: bool = False) -> dict:
         endpoint_doc = self.get_endpoint_doc_from_db(endpoint_name)
 
-        if endpoint_doc and endpoint_doc.get("keys") and (datetime.now(datetime.UTC) - endpoint_doc.get("timestamp", datetime.min.replace(tzinfo=timezone.utc))).days < self.update_interval and not force_update:
+        if endpoint_doc and endpoint_doc.get("keys") and (datetime.now(timezone.utc) - endpoint_doc.get("timestamp", datetime.min.replace(tzinfo=timezone.utc))).days < self.update_interval and not force_update:
             self.logger.info(f"Using cached keys for endpoint: {endpoint_name}")
             return endpoint_doc.get("keys", {}), endpoint_doc.get("endpoint_query", None)
         elif not endpoint_doc:
