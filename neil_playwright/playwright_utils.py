@@ -868,17 +868,12 @@ class PlaywrightManager:
                     f.write(image_bytes)
                 return local_path
             elif path.startswith("GCS:"):
-                gcs_path = path.split("GCS:")[1]
-                gcs_parts = gcs_path.split("/", 1)
-                gcs_bucket = gcs_parts[0]
-                gcs_prefix = gcs_parts[1] if len(gcs_parts) > 1 else ""
-                if not gcs_prefix.endswith("/") and gcs_prefix != "":
-                    gcs_prefix += "/"
-                client = storage.Client.from_service_account_json(self.configuration.get("GCS_CREDENTIALS", "service_account.json"))
-                bucket = client.bucket(gcs_bucket)
-                blob = bucket.blob(gcs_prefix + filename)
+                if path.endswith("/"):
+                    path = path.rstrip("/")
+                gcs_path = f"{path}/{filename}"
+                blob = self.get_blob(gcs_path)
                 blob.upload_from_string(image_bytes, content_type="image/png")
-                return f"https://storage.googleapis.com/{gcs_bucket}/{gcs_prefix}{filename}"
+                return f"https://storage.googleapis.com/{gcs_path}"
             else:
                 path = path.rstrip("/")
                 Path(path).mkdir(parents=True, exist_ok=True)
