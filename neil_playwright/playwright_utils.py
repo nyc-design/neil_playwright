@@ -35,6 +35,7 @@ class PlaywrightManager:
         self.configuration = self._load_config(config)
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
+        self.extension_path = self.configuration.get("EXTENSIONS_PATH", None)
         self.is_captcha_extension = self.configuration.get("CAPTCHA_EXTENSION", False)
         self.should_screenshot_errors = self.configuration.get("ERROR_SCREENSHOTS", False)
         self.error_screenshot_path = self.configuration.get("ERROR_SCREENSHOTS_PATH", "screenshots/errors")
@@ -44,12 +45,15 @@ class PlaywrightManager:
         self.trace_debug_dir = self.configuration.get("TRACE_DEBUG_PATH", None)
 
         self.temp_dirs = []
-        if self.profile_path.startswith("GCS:"):
+        if self.profile_path and self.profile_path.startswith("GCS:"):
             self.gcs_profile = True
             self.gcs_profile_path = self.profile_path
             self.profile_path = self.download_gcs_profile(self.profile_path, self.profile_name)
         else:
             self.gcs_profile = False
+
+        if self.extension_path and self.extension_path.startswith("GCS:"):
+            self.extension_path = self.download_extensions(self.extension_path)
         
         self.data_utils = DataUtils(logger=self.logger)
 
@@ -129,6 +133,8 @@ class PlaywrightManager:
             args.append("--incognito")
         if self.profile_name:
             args.append(f"--profile-directory={self.profile_name}")
+        if self.extension_path:
+            args.append(f"--load-extension={self.get_extension_paths()}")
 
         if self.video_debug:
             additional_args, self.video_temp_path = self.get_video_debug_args()
@@ -210,7 +216,26 @@ class PlaywrightManager:
         self.context = self._init_context(headless=False)
         self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
         self.master_tab = self.page
-    
+
+
+    # ─────────────────────────────────────────────
+    # Path Helpers
+    # ─────────────────────────────────────────────
+
+    # Function to get the extension paths
+    def get_extension_paths(self):
+        base_dir = Path(self.extension_path)
+        if not base_dir.exists():
+            raise ValueError(f"Extension path does not exist: {base_dir}")
+        
+        # Get subdirectories only
+        ext_dirs = [str(d) for d in base_dir.iterdir() if d.is_dir()]
+        
+        if not ext_dirs:
+            raise ValueError(f"No valid extensions found in: {base_dir}")
+        
+        # Chrome expects comma-separated absolute paths
+        return ",".join(ext_dirs)        
 
     # ─────────────────────────────────────────────
     # URL Checkers
@@ -1026,6 +1051,24 @@ class PlaywrightManager:
         blob = bucket.blob(gcs_path)
 
         return blob
+    
+
+    # Function to download extensions from GCS
+    def download_extensions(self, gcs_path: str, temp_base: str = None):
+        if not temp_base:
+            temp_base = tempfile.gettempdir()
+        temp_dir = tempfile.mkdtemp(dir=temp_base)
+        self.temp_dirs.append(temp_dir)
+        temp_zip_path = os.path.join(temp_dir, "extensions.zip")
+        temp_ext_path = os.path.join(temp_dir, "extensions")
+
+        blob = self.get_blob(gcs_path)
+        blob.download_to_filename(temp_zip_path)
+
+        with zipfile.ZipFile(temp_zip_path, "r") as zip_ref:
+            zip_ref.extractall(temp_ext_path)
+
+        return temp_ext_path
 
 
     # Function to download a GCS profile
