@@ -47,6 +47,7 @@ class PlaywrightManager:
         self.temp_dirs = []
         if self.profile_path.startswith("GCS:"):
             self.gcs_profile = True
+            self.gcs_profile_path = self.profile_path
             self.profile_path = self.download_gcs_profile(self.profile_path, self.profile_name)
         else:
             self.gcs_profile = False
@@ -93,7 +94,7 @@ class PlaywrightManager:
 
         finally:
             if self.gcs_profile:
-                self.upload_gcs_profile(self.profile_path, self.profile_name)
+                self.upload_gcs_profile(self.gcs_profile_path, self.profile_name)
             if self.video_debug or self.trace_debug:
                 self.save_debug_files(self.video_debug_dir, self.trace_debug_dir)
             if self.temp_dirs:
