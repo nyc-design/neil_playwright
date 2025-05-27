@@ -97,6 +97,7 @@ class PlaywrightManager:
                 self.upload_gcs_profile(self.gcs_profile_path, self.profile_name)
             if self.video_debug or self.trace_debug:
                 self.save_debug_files(self.video_debug_dir, self.trace_debug_dir)
+            self.data_utils.cleanup_temp()
             if self.temp_dirs:
                 for temp_dir in self.temp_dirs:
                     shutil.rmtree(temp_dir)
@@ -1055,15 +1056,10 @@ class PlaywrightManager:
 
     # Function to download extensions from GCS
     def download_extensions(self, gcs_path: str, temp_base: str = None):
-        if not temp_base:
-            temp_base = tempfile.gettempdir()
-        temp_dir = tempfile.mkdtemp(dir=temp_base)
-        self.temp_dirs.append(temp_dir)
-        temp_zip_path = os.path.join(temp_dir, "extensions.zip")
-        temp_ext_path = os.path.join(temp_dir, "extensions")
+        temp_zip_path = self.data_utils.path_to_temp(path=gcs_path, temp_base=temp_base)
+        temp_dir = os.path.dirname(temp_zip_path)
 
-        blob = self.get_blob(gcs_path)
-        blob.download_to_filename(temp_zip_path)
+        temp_ext_path = os.path.join(temp_dir, "extensions")
 
         with zipfile.ZipFile(temp_zip_path, "r") as zip_ref:
             zip_ref.extractall(temp_ext_path)
@@ -1073,15 +1069,10 @@ class PlaywrightManager:
 
     # Function to download a GCS profile
     def download_gcs_profile(self, gcs_path: str, profile_name: str = "Profile 1", temp_base: str = None):
-        if not temp_base:
-            temp_base = tempfile.gettempdir()
-        temp_dir = tempfile.mkdtemp(dir=temp_base)
-        self.temp_dirs.append(temp_dir)
-        temp_zip_path = os.path.join(temp_dir, "chrome_profile.zip")
-        temp_profile_path = os.path.join(temp_dir, "chrome_profile")
+        temp_zip_path = self.data_utils.path_to_temp(path=gcs_path, temp_base=temp_base)
+        temp_dir = os.path.dirname(temp_zip_path)
 
-        blob = self.get_blob(gcs_path)
-        blob.download_to_filename(temp_zip_path)
+        temp_profile_path = os.path.join(temp_dir, "chrome_profile")
 
         with zipfile.ZipFile(temp_zip_path, "r") as zip_ref:
             zip_ref.extractall(temp_profile_path)
