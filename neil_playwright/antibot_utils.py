@@ -135,6 +135,10 @@ class AntiBotManager:
     def rotate_identity(self):
         random.shuffle(self.devices)
         random.shuffle(self.proxy_list)
+
+
+    # Function to add in JS stealth scripts
+    def add_stealth_scripts(self, context: BrowserContext):
     
 # ─────────────────────────────────────────────
 # Captcha detection
