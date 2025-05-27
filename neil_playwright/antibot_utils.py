@@ -146,12 +146,13 @@ class AntiBotManager:
 
     # Function to add in JS stealth scripts
     def add_stealth_scripts(self, context):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        stealth_js_dir = os.path.join(base_dir, "stealth_js")
         scripts = []
-        
-        with importlib.resources.path("neil_playwright.stealth_js", "") as stealth_dir:
-            for filename in sorted(glob.glob(os.path.join(stealth_dir, "*.js"))):
-                with open(filename, "r", encoding="utf-8") as f:
-                    scripts.append(f.read())
+
+        for filename in sorted(glob.glob(os.path.join(stealth_js_dir, "*.js"))):
+            with open(filename, "r", encoding="utf-8") as f:
+                scripts.append(f.read())
         
         for script in scripts:
             context.add_init_script(script)
