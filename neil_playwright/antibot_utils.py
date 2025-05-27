@@ -149,15 +149,17 @@ class AntiBotManager:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         stealth_js_dir = os.path.join(base_dir, "stealth_js")
         scripts = []
+        script_names = []
 
-        self.logger.info(f"Adding stealth scripts from {stealth_js_dir}")
         for filename in sorted(glob.glob(os.path.join(stealth_js_dir, "*.js"))):
-            self.logger.info(f"Adding stealth script: {filename}")
             with open(filename, "r", encoding="utf-8") as f:
                 scripts.append(f.read())
+                script_names.append(os.path.basename(filename))
         
         for script in scripts:
             context.add_init_script(script)
+
+        self.logger.info(f"Added {len(scripts)} stealth scripts to context: {', '.join(script_names)}")
         
         return context
     
