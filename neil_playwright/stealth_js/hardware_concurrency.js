@@ -1,0 +1,1 @@
+Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 });

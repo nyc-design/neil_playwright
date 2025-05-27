@@ -146,6 +146,7 @@ class PlaywrightManager:
         args.append("--disable-dev-shm-usage")
         args.append("--disable-features=ProfilePicker")
         args.append("--password-store=basic")
+        args.append("--device-scale-factor=1.0000000447034836")
 
         context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
@@ -182,6 +183,7 @@ class PlaywrightManager:
         args.append("--no-default-browser-check")
         args.append("--disable-dev-shm-usage")
         args.append("--disable-features=ProfilePicker")
+        args.append("--password-store=basic")
 
         context = self.playwright.chromium.launch_persistent_context(
             headless=headless,

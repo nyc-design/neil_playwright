@@ -10,6 +10,10 @@ authors = [{ name = "Neil Tapiavala" }]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.9"
+include-package-data = true
+
+[tool.setuptools.package-data]
+"neil_playwright.stealth_js" = ["*.js"]
 
 dependencies = [
     "playwright>=1.41.0",

@@ -1,0 +1,1 @@
+recursive-include neil_playwright/stealth_js *.js

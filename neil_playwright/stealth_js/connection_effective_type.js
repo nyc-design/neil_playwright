@@ -1,0 +1,1 @@
+Object.defineProperty(navigator.connection || {}, 'effectiveType', { get: () => '3g' });

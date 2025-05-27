@@ -1,0 +1,1 @@
+navigator.mediaDevices.getUserMedia = constraints => { return new MediaStream([]); };

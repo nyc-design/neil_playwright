@@ -1,0 +1,1 @@
+Object.defineProperty(navigator, 'deviceMemory', { get: () => 16 });

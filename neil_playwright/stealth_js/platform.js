@@ -1,0 +1,1 @@
+Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });

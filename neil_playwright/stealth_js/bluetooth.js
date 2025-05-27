@@ -1,0 +1,1 @@
+if (!navigator.bluetooth) { navigator.bluetooth = {}; }

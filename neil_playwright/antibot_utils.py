@@ -3,7 +3,8 @@ import random
 import requests
 import json
 import os
-
+import glob
+import importlib.resources
 
 class AntiBotManager:
     def __init__(self, mode: str = "desktop", config = None, logger: UniversalLogger = None):
@@ -112,14 +113,20 @@ class AntiBotManager:
 
         device_args = playwright_devices.get(self.device)
         device_args.pop("default_browser_type", None)
+        device_args.pop("defaultBrowserType", None)
+        device_args.pop("device_scale_factor", None)
+        device_args.pop("deviceScaleFactor", None)
 
         args = {
             **device_args,
             "locale": "en-US",
             "geolocation": {"longitude": self.geo["longitude"], "latitude": self.geo["latitude"], "accuracy": 100},
             "permissions": ["geolocation"],
-            "timezone_id": self.geo["timezone"]
+            "timezone_id": self.geo["timezone"],
         }
+
+        if self.mode != "mobile":
+            args["device_scale_factor"] = 1.0000000447034836
 
         if self.proxy:
             args["proxy"] = {
@@ -139,10 +146,16 @@ class AntiBotManager:
 
     # Function to add in JS stealth scripts
     def add_stealth_scripts(self, context):
-        stealth_scripts ="Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});Object.defineProperty(navigator.connection || {}, 'effectiveType', {get: () => '3g'});if (!navigator.bluetooth) { navigator.bluetooth = {}; }"
-
-        context.add_init_script(stealth_scripts)
-
+        scripts = []
+        
+        with importlib.resources.path("neil_playwright.stealth_js", "") as stealth_dir:
+            for filename in sorted(glob.glob(os.path.join(stealth_dir, "*.js"))):
+                with open(filename, "r", encoding="utf-8") as f:
+                    scripts.append(f.read())
+        
+        for script in scripts:
+            context.add_init_script(script)
+        
         return context
     
 # ─────────────────────────────────────────────
