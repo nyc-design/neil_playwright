@@ -192,7 +192,7 @@ class GPTHandler:
         if not model:
             model = self.upper_model
         try:
-            prompt = "Extract exactly the 6-digit verification code from this LinkedIn email / text. Return only the code, nothing else:"
+            prompt = "Extract exactly the 6-digit verification code from this LinkedIn email / text. Return only the code digits, nothing else:"
             # ask GPT to extract exactly the 6-digit code
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
