@@ -145,6 +145,7 @@ class PlaywrightManager:
         args.append("--no-default-browser-check")
         args.append("--disable-dev-shm-usage")
         args.append("--disable-features=ProfilePicker")
+        args.append("--password-store=basic")
 
         context = self.playwright.chromium.launch_persistent_context(
             user_data_dir=profile_dir,
@@ -155,7 +156,7 @@ class PlaywrightManager:
         )
 
         context = self.abm.add_stealth_scripts(context)
-        
+
         if self.trace_debug:
             context.tracing.start(screenshots=True, snapshots=True, sources=True)
             
