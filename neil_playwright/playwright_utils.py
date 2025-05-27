@@ -32,6 +32,7 @@ from url_normalize import url_normalize
 class PlaywrightManager:
     def __init__(self, config = None, logger: UniversalLogger = None):
         self.logger = logger or SimpleNamespace(info = print, warning = print, error = print, debug = print)
+        self.data_utils = DataUtils(logger=self.logger)
         self.configuration = self._load_config(config)
         self.profile_path = self.configuration.get("PROFILE_PATH", None)
         self.profile_name = self.configuration.get("PROFILE_NAME", None)
@@ -54,8 +55,6 @@ class PlaywrightManager:
 
         if self.extension_path and self.extension_path.startswith("GCS:"):
             self.extension_path = self.download_extensions(self.extension_path)
-        
-        self.data_utils = DataUtils(logger=self.logger)
 
 
     def launch_playwright(self, mode: str = "desktop", persist_session: bool = False, context_id: str = "default", headless: bool = False, incognito: bool = False):
