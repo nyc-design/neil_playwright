@@ -138,7 +138,12 @@ class AntiBotManager:
 
 
     # Function to add in JS stealth scripts
-    def add_stealth_scripts(self, context: BrowserContext):
+    def add_stealth_scripts(self, context):
+        stealth_scripts ="Object.defineProperty(navigator, 'platform', {get: () => 'Win32'});Object.defineProperty(navigator.connection || {}, 'effectiveType', {get: () => '3g'});if (!navigator.bluetooth) { navigator.bluetooth = {}; }"
+
+        context.add_init_script(stealth_scripts)
+
+        return context
     
 # ─────────────────────────────────────────────
 # Captcha detection
