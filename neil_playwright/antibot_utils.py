@@ -97,7 +97,7 @@ class AntiBotManager:
             }
 
         except Exception as e:
-            print(f"[GeoLookup] Failed to fetch geolocation: {e}")
+            self.logger.warning(f"[GeoLookup] Failed to fetch geolocation: {e}")
             return fallback or {
                 "latitude": 32.7157,
                 "longitude": -117.1611,
@@ -151,6 +151,7 @@ class AntiBotManager:
         scripts = []
 
         for filename in sorted(glob.glob(os.path.join(stealth_js_dir, "*.js"))):
+            self.logger.info(f"Adding stealth script: {filename}")
             with open(filename, "r", encoding="utf-8") as f:
                 scripts.append(f.read())
         
