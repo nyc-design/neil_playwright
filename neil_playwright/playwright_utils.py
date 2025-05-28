@@ -1225,7 +1225,7 @@ class PlaywrightManager:
     # Chrome Profile Helpers
     # ─────────────────────────────────────────────
 
-    def wait_for_no_chrome(process_name="chrome", timeout=20.0, poll_interval=0.2):
+    def wait_for_no_chrome(self, process_name="chrome", timeout=20.0, poll_interval=0.2):
         deadline = time.time() + timeout
         while time.time() < deadline:
             # scan all PIDs
