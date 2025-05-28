@@ -207,6 +207,11 @@ class PlaywrightManager:
 
         context = self.abm.add_stealth_scripts(context)
 
+        for p in context.pages():
+            p.close()
+
+        page = context.new_page()
+
         if self.trace_debug:
             context.tracing.start(screenshots=True, snapshots=True, sources=True)
 
