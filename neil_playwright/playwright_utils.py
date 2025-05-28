@@ -26,6 +26,7 @@ import zipfile
 import shutil
 import tempfile
 from url_normalize import url_normalize
+import psutil
 
 
 
@@ -92,10 +93,12 @@ class PlaywrightManager:
             self.logger.error(f"Unexpected error during shutdown: {final_error}. Screenshot saved to {screenshot_path}")
 
         finally:
+            self.wait_for_no_chrome()
+            self.wait_for_quiet(self.profile_path)
             if self.gcs_profile:
-                self.upload_gcs_profile(self.gcs_profile_path, self.profile_name)
+                self.upload_gcs_profile(gcs_path=self.gcs_profile_path, profile_name=self.profile_name, temp_path=self.profile_path)
             if self.video_debug or self.trace_debug:
-                self.save_debug_files(self.video_debug_dir, self.trace_debug_dir)
+                self.save_debug_files(video_dir=self.video_debug_dir, trace_dir=self.trace_debug_dir)
             self.data_utils.cleanup_temp()
             if self.temp_dirs:
                 for temp_dir in self.temp_dirs:
@@ -1216,3 +1219,48 @@ class PlaywrightManager:
                         self.logger.error(f"Failed to save video: {e}")
             else:
                 self.logger.info(f"Video saved to {self.video_temp_path}")
+
+
+    # ─────────────────────────────────────────────
+    # Chrome Profile Helpers
+    # ─────────────────────────────────────────────
+
+    def wait_for_no_chrome(self, process_name="chrome", timeout=20.0, poll_interval=0.2):
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if not any(
+                (p.info["name"] or "").lower().find(process_name) >= 0
+                for p in psutil.process_iter(["name"])
+            ):
+                return True
+            time.sleep(poll_interval)
+
+        return False
+    
+
+    def wait_for_quiet(self, dir_path, quiet_time=3.0, timeout=30.0, poll_interval=0.2):
+        mtimes = {}
+        def scan_changes():
+            changed = False
+            for root, _, files in os.walk(dir_path):
+                for f in files:
+                    p = os.path.join(root, f)
+                    try:
+                        m = os.path.getmtime(p)
+                    except OSError:
+                        continue
+                    if p not in mtimes or mtimes[p] != m:
+                        mtimes[p] = m
+                        changed = True
+            return changed
+
+        deadline = time.time() + timeout
+        last_change = time.time()
+        scan_changes()  # prime the pump
+        while time.time() < deadline:
+            if scan_changes():
+                last_change = time.time()
+            elif time.time() - last_change >= quiet_time:
+                return True
+            time.sleep(poll_interval)
+        return False
