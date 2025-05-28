@@ -93,9 +93,9 @@ class PlaywrightManager:
             self.logger.error(f"Unexpected error during shutdown: {final_error}. Screenshot saved to {screenshot_path}")
 
         finally:
-            self.wait_for_no_chrome()
-            self.wait_for_quiet(self.profile_path)
             if self.gcs_profile:
+                self.wait_for_no_chrome()
+                self.wait_for_quiet(self.profile_path)
                 self.upload_gcs_profile(gcs_path=self.gcs_profile_path, profile_name=self.profile_name, temp_path=self.profile_path)
             if self.video_debug or self.trace_debug:
                 self.save_debug_files(video_dir=self.video_debug_dir, trace_dir=self.trace_debug_dir)
