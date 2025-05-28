@@ -23,7 +23,7 @@ dependencies = [
     "tldextract",
     "pymongo",
     "openai>=1.3.5",
-    "psutil>=5.9.0",
+    "psutil>=5.9.5",
     "google-cloud-storage",
     "url-normalize",
     "neil-logger @ git+https://github.com/nyc-design/neil_logger.git",
