@@ -1225,16 +1225,22 @@ class PlaywrightManager:
     # Chrome Profile Helpers
     # ─────────────────────────────────────────────
 
-    def wait_for_no_chrome(self, process_name="chrome", timeout=20.0, poll_interval=0.2):
+    def wait_for_no_chrome(process_name="chrome", timeout=20.0, poll_interval=0.2):
         deadline = time.time() + timeout
         while time.time() < deadline:
-            if not any(
-                (p.info["name"] or "").lower().find(process_name) >= 0
-                for p in psutil.process_iter(["name"])
-            ):
+            # scan all PIDs
+            found = False
+            for pid in psutil.pids():
+                try:
+                    name = psutil.Process(pid).name().lower()
+                except (psutil.NoSuchProcess, psutil.AccessDenied):
+                    continue
+                if process_name in name:
+                    found = True
+                    break
+            if not found:
                 return True
             time.sleep(poll_interval)
-
         return False
     
 
