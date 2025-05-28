@@ -145,7 +145,7 @@ class AntiBotManager:
 
 
     # Function to add in JS stealth scripts
-    def get_stealth_scripts(self):
+    def add_stealth_scripts(self, context):
         base_dir = os.path.dirname(os.path.abspath(__file__))
         stealth_js_dir = os.path.join(base_dir, "stealth_js")
         scripts = []
@@ -155,10 +155,13 @@ class AntiBotManager:
             with open(filename, "r", encoding="utf-8") as f:
                 scripts.append(f.read())
                 script_names.append(os.path.basename(filename))
-    
+        
+        for script in scripts:
+            context.add_init_script(script)
+
         self.logger.info(f"Added {len(scripts)} stealth scripts to context: {', '.join(script_names)}")
         
-        return scripts
+        return context
     
 # ─────────────────────────────────────────────
 # Captcha detection

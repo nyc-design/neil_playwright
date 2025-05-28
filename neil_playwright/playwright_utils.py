@@ -140,9 +140,6 @@ class PlaywrightManager:
             additional_args, self.video_temp_path = self.get_video_debug_args()
             context_args.update(additional_args)
 
-
-        init_scripts = self.abm.get_stealth_scripts()
-
         args.append("--no-first-run")
         args.append("--no-default-browser-check")
         args.append("--disable-dev-shm-usage")
@@ -160,9 +157,15 @@ class PlaywrightManager:
             headless=headless,
             channel="chrome",
             args=args,
-            init_scripts=init_scripts,
             **context_args  # <- apply proxy, user-agent, locale, geo, etc.
         )
+
+        init_scripts = self.abm.get_stealth_scripts(context)
+
+        for p in context.pages():
+            p.close()
+
+        page = context.new_page()
 
         if self.trace_debug:
             context.tracing.start(screenshots=True, snapshots=True, sources=True)
@@ -195,15 +198,14 @@ class PlaywrightManager:
         args.append("--enable-swiftshader")
         args.append("--use-gl=swiftshader")
 
-        init_scripts = self.abm.get_stealth_scripts()
-
         context = self.playwright.chromium.launch_persistent_context(
             headless=headless,
             executable_path=self.chrome_path,
             args=args,
-            init_scripts=init_scripts,
             **context_args
         )
+
+        init_scripts = self.abm.get_stealth_scripts(context)
 
         if self.trace_debug:
             context.tracing.start(screenshots=True, snapshots=True, sources=True)
