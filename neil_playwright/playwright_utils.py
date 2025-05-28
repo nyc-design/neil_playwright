@@ -162,7 +162,7 @@ class PlaywrightManager:
 
         context = self.abm.add_stealth_scripts(context)
 
-        for p in context.pages():
+        for p in context.pages:
             p.close()
 
         page = context.new_page()
@@ -207,7 +207,7 @@ class PlaywrightManager:
 
         context = self.abm.add_stealth_scripts(context)
 
-        for p in context.pages():
+        for p in context.pages:
             p.close()
 
         page = context.new_page()
