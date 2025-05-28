@@ -160,7 +160,7 @@ class PlaywrightManager:
             **context_args  # <- apply proxy, user-agent, locale, geo, etc.
         )
 
-        init_scripts = self.abm.get_stealth_scripts(context)
+        context = self.abm.add_stealth_scripts(context)
 
         for p in context.pages():
             p.close()
@@ -205,7 +205,7 @@ class PlaywrightManager:
             **context_args
         )
 
-        init_scripts = self.abm.get_stealth_scripts(context)
+        context = self.abm.add_stealth_scripts(context)
 
         if self.trace_debug:
             context.tracing.start(screenshots=True, snapshots=True, sources=True)
