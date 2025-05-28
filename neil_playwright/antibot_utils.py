@@ -160,6 +160,10 @@ class AntiBotManager:
             context.add_init_script(script)
 
         self.logger.info(f"Added {len(scripts)} stealth scripts to context: {', '.join(script_names)}")
+
+        context.set_extra_http_headers({
+            "sec-ch-ua-platform": '"Windows"',
+        })
         
         return context
     
